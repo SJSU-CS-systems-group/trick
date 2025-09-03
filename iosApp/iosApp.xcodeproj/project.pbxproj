@@ -85,6 +85,7 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
+				B9DA98012DC14AB000A4DA20 /* LibSignalClient */,
 			);
 			productName = iosApp;
 			productReference = B9DA97B12DC1472C00A4DA20 /* Trick.app */;
@@ -116,6 +117,9 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B9DA97B22DC1472C00A4DA20 /* Products */;
+			packageReferences = (
+				B9DA98002DC14AB000A4DA20 /* XCRemoteSwiftPackageReference "libsignal" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -374,6 +378,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B9DA98002DC14AB000A4DA20 /* XCRemoteSwiftPackageReference "libsignal" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/signalapp/libsignal";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.79.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B9DA98012DC14AB000A4DA20 /* LibSignalClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B9DA98002DC14AB000A4DA20 /* XCRemoteSwiftPackageReference "libsignal" */;
+			productName = LibSignalClient;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B9DA97A92DC1472C00A4DA20 /* Project object */;
 }
