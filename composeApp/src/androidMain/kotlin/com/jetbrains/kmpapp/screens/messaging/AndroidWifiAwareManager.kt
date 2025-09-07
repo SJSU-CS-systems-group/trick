@@ -18,8 +18,6 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.net.wifi.aware.AttachCallback
 import android.provider.Settings
-import kotlinx.coroutines.*
-
 class AndroidWifiAwareManager(private val context: Context) {
     private var wifiAwareManager: WifiAwareManager? = null
     private var session: WifiAwareSession? = null
@@ -27,9 +25,6 @@ class AndroidWifiAwareManager(private val context: Context) {
     private var subscribeSession: DiscoverySession? = null
     private var peerHandle: PeerHandle? = null
     private var messageCallback: ((String) -> Unit)? = null
-    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val pendingMessages = mutableSetOf<Int>() // Track pending message IDs
-    private val messageResults = mutableMapOf<Int, Boolean>() // Track message results
 
     init {
         wifiAwareManager = context.getSystemService(Context.WIFI_AWARE_SERVICE) as? WifiAwareManager
@@ -89,14 +84,10 @@ class AndroidWifiAwareManager(private val context: Context) {
                             
                             override fun onMessageSendSucceeded(messageId: Int) {
                                 Log.d("WifiAware", "Message sent successfully via publish session, ID: $messageId")
-                                pendingMessages.remove(messageId)
-                                messageResults[messageId] = true
                             }
                             
                             override fun onMessageSendFailed(messageId: Int) {
                                 Log.e("WifiAware", "Message send failed via publish session, ID: $messageId")
-                                pendingMessages.remove(messageId)
-                                messageResults[messageId] = false
                             }
                             
                             override fun onSessionConfigUpdated() {
@@ -146,14 +137,10 @@ class AndroidWifiAwareManager(private val context: Context) {
                             
                             override fun onMessageSendSucceeded(messageId: Int) {
                                 Log.d("WifiAware", "Message sent successfully via subscribe session, ID: $messageId")
-                                pendingMessages.remove(messageId)
-                                messageResults[messageId] = true
                             }
                             
                             override fun onMessageSendFailed(messageId: Int) {
                                 Log.e("WifiAware", "Message send failed via subscribe session, ID: $messageId")
-                                pendingMessages.remove(messageId)
-                                messageResults[messageId] = false
                             }
                             
                             override fun onSessionConfigUpdated() {
@@ -184,114 +171,23 @@ class AndroidWifiAwareManager(private val context: Context) {
             return
         }
         
-        Log.d("WifiAware", "Attempting to send message: $message to peer: $peer")
-        Log.d("WifiAware", "Publish session available: ${publishSession != null}")
-        Log.d("WifiAware", "Subscribe session available: ${subscribeSession != null}")
-        
-        // Use coroutine to add delay and retry logic
-        coroutineScope.launch {
-            sendMessageWithRetry(message, peer, maxRetries = 3)
+        val subscribeSession = subscribeSession as? SubscribeDiscoverySession
+        if (subscribeSession == null) {
+            Log.e("WifiAware", "No subscribe session available - cannot send message")
+            return
         }
-    }
-    
-    private suspend fun sendMessageWithRetry(message: String, peer: PeerHandle, maxRetries: Int) {
+        
+        Log.d("WifiAware", "Sending message: $message to peer: $peer")
+        
         val messageBytes = message.toByteArray()
-        var retryCount = 0
+        val messageId = System.currentTimeMillis().toInt()
         
-        while (retryCount < maxRetries) {
-            val messageId = System.currentTimeMillis().toInt() + retryCount
-            
-            Log.d("WifiAware", "Attempt $retryCount: Sending message: $message (ID: $messageId)")
-            
-            // Add small delay to ensure session is ready
-            if (retryCount > 0) {
-                delay(500) // 500ms delay between retries
-            }
-            
-            // Try to send via subscribe session first (more reliable for messaging)
-            val subscribeSession = subscribeSession as? SubscribeDiscoverySession
-            if (subscribeSession != null) {
-                try {
-                    Log.d("WifiAware", "Sending via subscribe session...")
-                    pendingMessages.add(messageId) // Track this message
-                    subscribeSession.sendMessage(peer, messageId, messageBytes)
-                    Log.d("WifiAware", "Message sent via subscribe session: $message (ID: $messageId)")
-                    
-                    // Wait for callback result with timeout
-                    val success = waitForMessageResult(messageId, timeoutMs = 2000)
-                    if (success) {
-                        Log.d("WifiAware", "Message $messageId confirmed successful via subscribe session")
-                        return
-                    } else {
-                        Log.w("WifiAware", "Message $messageId failed via subscribe session")
-                    }
-                } catch (e: Exception) {
-                    Log.e("WifiAware", "Failed to send via subscribe session: ${e.message}")
-                    Log.e("WifiAware", "Exception type: ${e.javaClass.simpleName}")
-                    pendingMessages.remove(messageId)
-                }
-            }
-            
-            // Fallback: Try to send via publish session
-            val publishSession = publishSession as? PublishDiscoverySession
-            if (publishSession != null) {
-                try {
-                    Log.d("WifiAware", "Fallback: Sending via publish session...")
-                    pendingMessages.add(messageId) // Track this message
-                    publishSession.sendMessage(peer, messageId, messageBytes)
-                    Log.d("WifiAware", "Message sent via publish session: $message (ID: $messageId)")
-                    
-                    // Wait for callback result with timeout
-                    val success = waitForMessageResult(messageId, timeoutMs = 2000)
-                    if (success) {
-                        Log.d("WifiAware", "Message $messageId confirmed successful via publish session")
-                        return
-                    } else {
-                        Log.w("WifiAware", "Message $messageId failed via publish session")
-                    }
-                } catch (e: Exception) {
-                    Log.e("WifiAware", "Failed to send via publish session: ${e.message}")
-                    Log.e("WifiAware", "Exception type: ${e.javaClass.simpleName}")
-                    pendingMessages.remove(messageId)
-                }
-            }
-            
-            retryCount++
-            Log.w("WifiAware", "Retry $retryCount/$maxRetries failed")
+        try {
+            subscribeSession.sendMessage(peer, messageId, messageBytes)
+            Log.d("WifiAware", "Message sent: $message")
+        } catch (e: Exception) {
+            Log.e("WifiAware", "Failed to send message: ${e.message}")
         }
-        
-        Log.e("WifiAware", "Failed to send message after $maxRetries attempts")
-    }
-    
-    private suspend fun waitForMessageResult(messageId: Int, timeoutMs: Long): Boolean {
-        val startTime = System.currentTimeMillis()
-        
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            // Check if we have a result for this message
-            messageResults[messageId]?.let { result ->
-                messageResults.remove(messageId) // Clean up
-                return result
-            }
-            
-            // Check if message is no longer pending (callback arrived)
-            if (!pendingMessages.contains(messageId)) {
-                // Message was removed from pending, check if we have a result
-                messageResults[messageId]?.let { result ->
-                    messageResults.remove(messageId) // Clean up
-                    return result
-                }
-                // If no result found, assume failure
-                return false
-            }
-            
-            delay(50) // Check every 50ms
-        }
-        
-        // Timeout reached
-        Log.w("WifiAware", "Timeout waiting for message result: $messageId")
-        pendingMessages.remove(messageId)
-        messageResults.remove(messageId)
-        return false
     }
     
     private fun handleIncomingMessage(message: String) {
@@ -312,9 +208,6 @@ class AndroidWifiAwareManager(private val context: Context) {
     }
     
     fun stopDiscovery() {
-        coroutineScope.cancel()
-        pendingMessages.clear()
-        messageResults.clear()
         publishSession?.close()
         subscribeSession?.close()
         session?.close()
