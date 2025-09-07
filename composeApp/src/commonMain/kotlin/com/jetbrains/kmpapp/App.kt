@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
+import com.jetbrains.kmpapp.screens.messaging.Message
 import com.jetbrains.kmpapp.screens.messaging.WifiAwareService
 import kotlin.native.concurrent.ThreadLocal
 
@@ -20,7 +21,7 @@ fun App(wifiAwareService: WifiAwareService) {
         colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
     ) {
         Surface {
-            val messages = remember { mutableStateListOf<String>() }
+            val messages = remember { mutableStateListOf<Message>() }
             val debugLogs = remember { mutableStateListOf<String>() }
             val discoveryStatus = remember { mutableStateOf("Not started") }
             val lastReceivedMessage = remember { mutableStateOf("") }
@@ -33,7 +34,12 @@ fun App(wifiAwareService: WifiAwareService) {
                 wifiAwareService.startDiscovery { msg ->
                     debugLogs.add("[App] Message received: $msg")
                     println("[App] Message received: $msg")
-                    messages.add(msg)
+                    val message = Message(
+                        content = msg,
+                        isSent = false,
+                        isServiceMessage = msg.startsWith("Service discovered:")
+                    )
+                    messages.add(message)
                     lastReceivedMessage.value = msg
                 }
                 discoveryStatus.value = "Running"
@@ -45,7 +51,12 @@ fun App(wifiAwareService: WifiAwareService) {
                 wifiAwareService.startDiscovery { msg ->
                     debugLogs.add("[App] Message received (refresh): $msg")
                     println("[App] Message received (refresh): $msg")
-                    messages.add(msg)
+                    val message = Message(
+                        content = msg,
+                        isSent = false,
+                        isServiceMessage = msg.startsWith("Service discovered:")
+                    )
+                    messages.add(message)
                     lastReceivedMessage.value = msg
                 }
                 discoveryStatus.value = "Running (refreshed)"
@@ -57,7 +68,12 @@ fun App(wifiAwareService: WifiAwareService) {
                     debugLogs.add("[App] Sending message: $msg")
                     println("[App] Sending message: $msg")
                     wifiAwareService.sendMessage(msg)
-                    messages.add(msg)
+                    val message = Message(
+                        content = msg,
+                        isSent = true,
+                        isServiceMessage = false
+                    )
+                    messages.add(message)
                     lastSentMessage.value = msg
                 },
                 debugLogs = debugLogs,

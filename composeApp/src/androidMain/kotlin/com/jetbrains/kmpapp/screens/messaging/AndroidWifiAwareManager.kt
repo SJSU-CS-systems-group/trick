@@ -9,12 +9,15 @@ import android.net.wifi.aware.WifiAwareSession
 import android.net.wifi.aware.DiscoverySession
 import android.net.wifi.aware.DiscoverySessionCallback
 import android.net.wifi.aware.PeerHandle
+import android.net.wifi.aware.PublishDiscoverySession
+import android.net.wifi.aware.SubscribeDiscoverySession
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.net.wifi.aware.AttachCallback
+import android.provider.Settings
 import kotlinx.coroutines.*
 
 class AndroidWifiAwareManager(private val context: Context) {
@@ -40,6 +43,18 @@ class AndroidWifiAwareManager(private val context: Context) {
         )
         return perms.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
     }
+    
+    private fun getDeviceName(): String {
+        return try {
+            Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+                ?: Settings.Secure.getString(context.contentResolver, "bluetooth_name")
+                ?: android.os.Build.MODEL
+                ?: "Unknown Device"
+        } catch (e: Exception) {
+            Log.w("WifiAware", "Could not get device name: ${e.message}")
+            android.os.Build.MODEL ?: "Unknown Device"
+        }
+    }
 
     fun startDiscovery(onMessageReceived: (String) -> Unit) {
         messageCallback = onMessageReceived
@@ -54,12 +69,14 @@ class AndroidWifiAwareManager(private val context: Context) {
                     Log.d("WifiAware", "Attached to WiFi Aware session")
                     
                     // Start publishing (advertising) the service
+                    val deviceName = getDeviceName()
+                    Log.d("WifiAware", "Publishing service with device name: $deviceName")
                     session.publish(PublishConfig.Builder()
                         .setServiceName("KMPChat")
-                        .setServiceSpecificInfo("Hello from KMP Chat!".toByteArray())
+                        .setServiceSpecificInfo(deviceName.toByteArray())
                         .build(), 
                         object : DiscoverySessionCallback() {
-                            override fun onPublishStarted(session: android.net.wifi.aware.PublishDiscoverySession) {
+                            override fun onPublishStarted(session: PublishDiscoverySession) {
                                 publishSession = session
                                 Log.d("WifiAware", "Publishing started")
                             }
@@ -100,7 +117,7 @@ class AndroidWifiAwareManager(private val context: Context) {
                         .setServiceName("KMPChat")
                         .build(),
                         object : DiscoverySessionCallback() {
-                            override fun onSubscribeStarted(session: android.net.wifi.aware.SubscribeDiscoverySession) {
+                            override fun onSubscribeStarted(session: SubscribeDiscoverySession) {
                                 subscribeSession = session
                                 Log.d("WifiAware", "Subscribing started")
                             }
@@ -110,9 +127,9 @@ class AndroidWifiAwareManager(private val context: Context) {
                                 Log.d("WifiAware", "Service discovered from peer: $peerHandle")
                                 Log.d("WifiAware", "Peer handle stored for messaging")
                                 serviceSpecificInfo?.let {
-                                    val msg = String(it)
-                                    Log.d("WifiAware", "Service info: $msg")
-                                    handleIncomingMessage("Service discovered: $msg")
+                                    val deviceName = String(it)
+                                    Log.d("WifiAware", "Service info: $deviceName")
+                                    handleIncomingMessage("Device discovered: $deviceName")
                                 }
                             }
                             
@@ -192,7 +209,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             }
             
             // Try to send via subscribe session first (more reliable for messaging)
-            val subscribeSession = subscribeSession as? android.net.wifi.aware.SubscribeDiscoverySession
+            val subscribeSession = subscribeSession as? SubscribeDiscoverySession
             if (subscribeSession != null) {
                 try {
                     Log.d("WifiAware", "Sending via subscribe session...")
@@ -216,7 +233,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             }
             
             // Fallback: Try to send via publish session
-            val publishSession = publishSession as? android.net.wifi.aware.PublishDiscoverySession
+            val publishSession = publishSession as? PublishDiscoverySession
             if (publishSession != null) {
                 try {
                     Log.d("WifiAware", "Fallback: Sending via publish session...")

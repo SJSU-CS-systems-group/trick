@@ -17,9 +17,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+data class Message(
+    val content: String,
+    val isSent: Boolean,
+    val isServiceMessage: Boolean = false
+)
+
 @Composable
 fun MessagingScreen(
-    messages: List<String>,
+    messages: List<Message>,
     onSend: (String) -> Unit,
     debugLogs: List<String>,
     discoveryStatus: String,
@@ -169,30 +175,34 @@ fun MessagingScreen(
 }
 
 @Composable
-private fun MessageBubble(message: String) {
-    val isServiceMessage = message.startsWith("Service discovered:")
-    
+private fun MessageBubble(message: Message) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isServiceMessage) Arrangement.Center else Arrangement.End
+        horizontalArrangement = when {
+            message.isServiceMessage -> Arrangement.Center
+            message.isSent -> Arrangement.End
+            else -> Arrangement.Start
+        }
     ) {
         Card(
             modifier = Modifier.widthIn(max = 280.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isServiceMessage) 
-                    MaterialTheme.colorScheme.secondaryContainer 
-                else 
-                    MaterialTheme.colorScheme.primary
+                containerColor = when {
+                    message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
+                    message.isSent -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
             ),
             shape = RoundedCornerShape(16.dp)
         ) {
             Text(
-                text = message,
+                text = message.content,
                 modifier = Modifier.padding(12.dp),
-                color = if (isServiceMessage) 
-                    MaterialTheme.colorScheme.onSecondaryContainer 
-                else 
-                    MaterialTheme.colorScheme.onPrimary,
+                color = when {
+                    message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
+                    message.isSent -> MaterialTheme.colorScheme.onPrimary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 style = MaterialTheme.typography.bodyMedium
             )
         }
