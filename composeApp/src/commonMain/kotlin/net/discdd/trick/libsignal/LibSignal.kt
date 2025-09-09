@@ -75,6 +75,16 @@ expect class LibSignalManager {
     fun getVersion(): String
     
     /**
+     * Encrypt data using a public key
+     */
+    fun encrypt(publicKey: PublicKey, data: ByteArray): ByteArray
+    
+    /**
+     * Decrypt data using a private key
+     */
+    fun decrypt(privateKey: PrivateKey, encryptedData: ByteArray): ByteArray
+    
+    /**
      * Test if libsignal is working
      */
     fun test(): String

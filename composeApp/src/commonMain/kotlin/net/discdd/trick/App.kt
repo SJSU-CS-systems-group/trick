@@ -24,8 +24,7 @@ import trick.composeapp.generated.resources.compose_multiplatform
 fun App() {
     MaterialTheme {
         var showContent by remember { mutableStateOf(false) }
-        var libSignalResult by remember { mutableStateOf("") }
-        var customResult by remember { mutableStateOf("") }
+        var encryptionResult by remember { mutableStateOf("") }
         
         Column(
             modifier = Modifier
@@ -37,19 +36,10 @@ fun App() {
             Button(onClick = { 
                 showContent = !showContent
                 if (showContent) {
-                    libSignalResult = getPlatform().testLibSignal()
+                    encryptionResult = getPlatform().testCustomLibSignal()
                 }
             }) {
-                Text("Test Hybrid LibSignal")
-            }
-            
-            Button(onClick = { 
-                showContent = !showContent
-                if (showContent) {
-                    customResult = getPlatform().testCustomLibSignal()
-                }
-            }) {
-                Text("Test Custom Wrapper")
+                Text("Test Signal Protocol Encryption")
             }
             AnimatedVisibility(showContent) {
                 val greeting = remember { Greeting().greet() }
@@ -59,15 +49,9 @@ fun App() {
                 ) {
                     Image(painterResource(Res.drawable.compose_multiplatform), null)
                     Text("Compose: $greeting")
-                    if (libSignalResult.isNotEmpty()) {
+                    if (encryptionResult.isNotEmpty()) {
                         Text(
-                            text = "\nHybrid Result:\n$libSignalResult",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    if (customResult.isNotEmpty()) {
-                        Text(
-                            text = "\nCustom Wrapper Result:\n$customResult",
+                            text = "\nSignal Protocol Encryption Result:\n$encryptionResult",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

@@ -13,7 +13,7 @@ kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
     
@@ -33,11 +33,10 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
 
-            // REAL Signal Foundation libsignal - use only the Android native library
-            // This gives us the native Rust libsignal without the problematic JVM wrapper
-            implementation("org.signal:libsignal-android:0.79.0") {
-                exclude(group = "org.signal", module = "libsignal-client")
-            }
+            // REAL Signal Foundation libsignal: include both per docs
+            // See: https://github.com/signalapp/libsignal (Maven Central section)
+            implementation("org.signal:libsignal-android:0.79.0")
+            implementation("org.signal:libsignal-client:0.79.0")
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -66,16 +65,17 @@ android {
         versionCode = 1
         versionName = "1.0"
         
-        // Enable multidex to handle large libsignal-client
+        // Enable multidex to handle libsignal
         multiDexEnabled = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            // Exclude non-Android libsignal native libraries as recommended by Signal
+            // Exclude non-Android libsignal native libraries per Signal docs
             excludes += setOf("libsignal_jni*.dylib", "signal_jni*.dll")
-            // Exclude testing libraries if not needed
+            // Optional: exclude testing JNI if not used
             excludes += "libsignal_jni_testing.so"
+            // Exclude testing libraries if not needed
             // Exclude problematic META-INF files that can cause issues
             excludes += "/META-INF/versions/**"
         }
@@ -97,8 +97,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true  // Required by libsignal-android
     }
 }
