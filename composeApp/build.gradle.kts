@@ -16,7 +16,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -27,7 +27,7 @@ kotlin {
             isStatic = true
         }
     }
-    
+
     sourceSets {
         androidMain.dependencies {
             implementation(compose.preview)
@@ -59,6 +59,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
@@ -77,6 +78,16 @@ android {
 }
 
 dependencies {
-    debugImplementation(compose.uiTooling)
+    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+
+    // Instrumented UI tests (run on emulator/device)
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+
+    // Needed at debug time to provide a test Activity/manifest
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
