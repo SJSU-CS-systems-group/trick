@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 36
+        build-tools: 36.0.0
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Build Android targets only
+      run: ./gradlew assembleDebug -Pkotlin.native.ignoreDisabledTargets=true -x compileKotlinIosArm64 -x compileKotlinIosX64 -x compileKotlinIosSimulatorArm64
+      env:
+        ANDROID_HOME: ${{ secrets.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
+        ANDROID_SDK_ROOT: ${{ secrets.ANDROID_SDK_ROOT || '/usr/local/lib/android/sdk' }}
+        
+    - name: Run tests
+      run: ./gradlew testDebugUnitTest -Pkotlin.native.ignoreDisabledTargets=true -x compileTestKotlinIosArm64 -x compileTestKotlinIosX64 -x compileTestKotlinIosSimulatorArm64
+      env:
+        ANDROID_HOME: ${{ secrets.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
+        ANDROID_SDK_ROOT: ${{ secrets.ANDROID_SDK_ROOT || '/usr/local/lib/android/sdk' }}
