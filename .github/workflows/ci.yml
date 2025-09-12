@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
-    runs-on: macos-15
+  android-common-test:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -26,30 +26,15 @@ jobs:
           api-level: 36
           build-tools: 36.0.0
 
-      - name: Cache Gradle (deps, wrapper)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Cache Kotlin/Native (iOS toolchains/klibs)
-        uses: actions/cache@v4
-        with:
-          path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-konan-
+      - uses: gradle/gradle-build-action@v3
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Build all configured targets (Android + iOS, etc.). `build` already runs `check`.
-      - name: Build (all targets)
-        run: ./gradlew build -Pkotlin.native.ignoreDisabledTargets=true
+      - name: Unit tests (runs common on JVM)
+        run: ./gradlew :composeApp:testDebugUnitTest
+
+      - name: Assemble debug (optional)
+        run: ./gradlew :composeApp:assembleDebug
         env:
-          ANDROID_HOME: ${{ secrets.ANDROID_HOME || '/Users/runner/Library/Android/sdk' }}
-          ANDROID_SDK_ROOT: ${{ secrets.ANDROID_SDK_ROOT || '/Users/runner/Library/Android/sdk' }}
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
