@@ -26,6 +26,17 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
         }
+        
+        // Configure C interop for LibSignal FFI
+        iosTarget.compilations.getByName("main") {
+            cinterops {
+                val libsignal by creating {
+                    defFile(project.file("src/nativeInterop/cinterop/libsignal.def"))
+                    packageName("net.discdd.trick.libsignal.bridge")
+                    compilerOpts("-I${project.file("src/nativeInterop/cinterop").absolutePath}")
+                }
+            }
+        }
     }
     
     sourceSets {
@@ -107,4 +118,3 @@ dependencies {
     debugImplementation(compose.uiTooling)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3") // Required by libsignal-android
 }
-

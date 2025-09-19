@@ -16,3 +16,16 @@ captures
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+
+# LibSignal and build artifacts (do NOT commit)
+LibSignalClient/
+iosApp/Pods/
+LibSignalClient/.cargo/
+temp-libsignal/target/
+**/xcode-frameworks/
+**/build/
+*.a
+
+# Keep CocoaPods spec files
+!iosApp/Podfile
+!iosApp/Podfile.lock

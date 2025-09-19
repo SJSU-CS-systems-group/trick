@@ -1,0 +1,27 @@
+PODS:
+  - LibSignalClient (0.80.3)
+  - SignalBridge (0.1.0):
+    - LibSignalClient
+
+DEPENDENCIES:
+  - LibSignalClient (from `https://github.com/signalapp/libsignal.git`)
+  - SignalBridge (from `SignalBridge`)
+
+EXTERNAL SOURCES:
+  LibSignalClient:
+    :git: https://github.com/signalapp/libsignal.git
+  SignalBridge:
+    :path: SignalBridge
+
+CHECKOUT OPTIONS:
+  LibSignalClient:
+    :commit: 43a23efa1118ac32a1434ab317025adfa2b91e4a
+    :git: https://github.com/signalapp/libsignal.git
+
+SPEC CHECKSUMS:
+  LibSignalClient: 832ac5a0f24a862122d7d617b709cd5209be63c6
+  SignalBridge: 5be7a11d1c6685722fe9d7cb27bad3563aa87c2c
+
+PODFILE CHECKSUM: d79feaff021a29112f3c7a10c4c671d02b775b8c
+
+COCOAPODS: 1.16.2
