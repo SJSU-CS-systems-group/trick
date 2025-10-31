@@ -1,0 +1,28 @@
+# Podfile for iOS app with LibSignalClient
+platform :ios, '15.0'
+
+use_frameworks!
+
+target 'iosApp' do
+  # LibSignalClient pod from official Signal repository
+  pod 'LibSignalClient', git: 'https://github.com/signalapp/libsignal.git'
+  
+  # Set the prebuild checksum for the latest release v0.80.3 
+  # Now compatible with LLVM 17.0.6 that we installed via Homebrew
+  ENV['LIBSIGNAL_FFI_PREBUILD_CHECKSUM'] = '0fd6842cff034e76f792029e698c5c5fa7d6fbd987e79d04d2e3be1e01c42c47'
+
+  # Local bridge framework that exposes @_cdecl C symbols backed by LibSignalClient
+  pod 'SignalBridge', :path => 'SignalBridge'
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Disable bitcode to avoid LLVM version conflicts
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      # Exclude arm64 architecture for iOS simulator to avoid linking issues
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+    end
+  end
+end

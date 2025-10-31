@@ -24,6 +24,8 @@ import trick.composeapp.generated.resources.compose_multiplatform
 fun App() {
     MaterialTheme {
         var showContent by remember { mutableStateOf(false) }
+        var encryptionResult by remember { mutableStateOf("") }
+        
         Column(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.primaryContainer)
@@ -31,8 +33,13 @@ fun App() {
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
+            Button(onClick = { 
+                showContent = !showContent
+                if (showContent) {
+                    encryptionResult = getPlatform().testCustomLibSignal()
+                }
+            }) {
+                Text("Test Signal Protocol Encryption")
             }
             AnimatedVisibility(showContent) {
                 val greeting = remember { Greeting().greet() }
@@ -42,6 +49,12 @@ fun App() {
                 ) {
                     Image(painterResource(Res.drawable.compose_multiplatform), null)
                     Text("Compose: $greeting")
+                    if (encryptionResult.isNotEmpty()) {
+                        Text(
+                            text = "\nSignal Protocol Encryption Result:\n$encryptionResult",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
