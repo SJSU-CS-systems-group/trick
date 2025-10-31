@@ -46,8 +46,14 @@ fun App(wifiAwareService: WifiAwareService) {
                 debugLogs.add("[UI] Discovery running.")
             }
             fun refreshDiscovery() {
-                debugLogs.add("[UI] Manual refresh triggered.")
-                discoveryStatus.value = "Refreshing..."
+                debugLogs.add("[UI] Manual refresh triggered - stopping discovery...")
+                discoveryStatus.value = "Stopping..."
+                
+                // Stop existing discovery first
+                wifiAwareService.stopDiscovery()
+                debugLogs.add("[UI] Discovery stopped. Restarting...")
+                
+                discoveryStatus.value = "Restarting..."
                 wifiAwareService.startDiscovery { msg ->
                     debugLogs.add("[App] Message received (refresh): $msg")
                     println("[App] Message received (refresh): $msg")
@@ -60,7 +66,7 @@ fun App(wifiAwareService: WifiAwareService) {
                     lastReceivedMessage.value = msg
                 }
                 discoveryStatus.value = "Running (refreshed)"
-                debugLogs.add("[UI] Discovery refreshed.")
+                debugLogs.add("[UI] Discovery restarted successfully.")
             }
             MessagingScreen(
                 messages = messages,
