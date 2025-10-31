@@ -53,7 +53,7 @@ class AndroidWifiAwareManager(private val context: Context) {
     }
 
     // Coroutines
-    private val scope = CoroutineScope(
+    private var scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
                 CoroutineExceptionHandler { _, throwable ->
                     Log.e(TAG, "Coroutine error", throwable)
@@ -82,6 +82,14 @@ class AndroidWifiAwareManager(private val context: Context) {
             Log.w(TAG, "Discovery already running")
             return
         }
+
+        // Create a fresh coroutine scope
+        scope = CoroutineScope(
+            SupervisorJob() + Dispatchers.IO +
+                    CoroutineExceptionHandler { _, throwable ->
+                        Log.e(TAG, "Coroutine error", throwable)
+                    }
+        )
 
         messageCallback = onMessageReceived
         connectionStatusCallback = onConnectionStatusChanged
@@ -431,10 +439,8 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             connectivityManager.requestNetwork(networkRequest, networkCallback)
 
-            // Wait for network with timeout
-            withTimeout(30000) {
-                network = callbackDeferred.await()
-            }
+            // Wait for network
+            network = callbackDeferred.await()
 
             Log.d(TAG, "[Server] Waiting for client connection on port $assignedPort")
 
@@ -561,10 +567,8 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             connectivityManager.requestNetwork(networkRequest, networkCallback)
 
-            // Wait for network and IPv6 with timeout
-            val (net, ipv6) = withTimeout(30000) {
-                callbackDeferred.await()
-            }
+            // Wait for network and IPv6
+            val (net, ipv6) = callbackDeferred.await()
 
             Log.d(TAG, "[Client] Connecting to server at [$ipv6]:$serverPort")
 

@@ -37,7 +37,7 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
         return manager.getConnectionStatus()
     }
 
-    fun stopDiscovery() {
+    override fun stopDiscovery() {
         Log.d("WifiAwareServiceImpl", "Stopping discovery")
         manager.stopDiscovery()
     }
