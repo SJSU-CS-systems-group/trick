@@ -1,0 +1,36 @@
+name: CI
+
+on: [push]
+
+jobs:
+  android-common-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 36
+          build-tools: 36.0.0
+
+      - uses: gradle/gradle-build-action@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Unit tests (runs common on JVM)
+        run: ./gradlew :composeApp:testDebugUnitTest
+
+      - name: Assemble debug (optional)
+        run: ./gradlew :composeApp:assembleDebug
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
