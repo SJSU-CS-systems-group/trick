@@ -10,17 +10,29 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.jetbrains.kmpapp.screens.UnsupportedDeviceScreen
 import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
 import com.jetbrains.kmpapp.screens.messaging.Message
 import com.jetbrains.kmpapp.screens.messaging.WifiAwareService
 import kotlin.native.concurrent.ThreadLocal
 
 @Composable
-fun App(wifiAwareService: WifiAwareService, permissionsGranted: Boolean = false) {
+fun App(
+    wifiAwareService: WifiAwareService, 
+    permissionsGranted: Boolean = false,
+    wifiAwareSupported: Boolean = true
+) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
     ) {
         Surface {
+            // Show unsupported screen if WiFi Aware is not available
+            if (!wifiAwareSupported) {
+                UnsupportedDeviceScreen()
+                return@Surface
+            }
+            
+            // Continue with normal app flow
             val messages = remember { mutableStateListOf<Message>() }
             val debugLogs = remember { mutableStateListOf<String>() }
             val discoveryStatus = remember { mutableStateOf("Waiting for permissions...") }
