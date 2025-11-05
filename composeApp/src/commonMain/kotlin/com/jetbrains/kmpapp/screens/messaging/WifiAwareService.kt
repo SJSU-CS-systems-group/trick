@@ -6,5 +6,7 @@ interface WifiAwareService {
     fun sendMessage(message: String)
     fun isPeerConnected(): Boolean
     fun getConnectionStatus(): String
+    fun getDeviceId(): String
+    fun getConnectedPeers(): List<String>
 }
 

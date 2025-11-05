@@ -11,14 +11,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.jetbrains.kmpapp.screens.UnsupportedDeviceScreen
-import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
 import com.jetbrains.kmpapp.screens.messaging.Message
+import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
 import com.jetbrains.kmpapp.screens.messaging.WifiAwareService
-import kotlin.native.concurrent.ThreadLocal
+import kotlinx.coroutines.delay
 
 @Composable
 fun App(
-    wifiAwareService: WifiAwareService, 
+    wifiAwareService: WifiAwareService,
     permissionsGranted: Boolean = false,
     wifiAwareSupported: Boolean = true
 ) {
@@ -31,13 +31,29 @@ fun App(
                 UnsupportedDeviceScreen()
                 return@Surface
             }
-            
+
             // Continue with normal app flow
             val messages = remember { mutableStateListOf<Message>() }
             val debugLogs = remember { mutableStateListOf<String>() }
             val discoveryStatus = remember { mutableStateOf("Waiting for permissions...") }
             val lastReceivedMessage = remember { mutableStateOf("") }
             val lastSentMessage = remember { mutableStateOf("") }
+            val localDeviceId = remember { mutableStateOf("") }
+            val connectedPeerIds = remember { mutableStateListOf<String>() }
+
+            // Initialize device ID
+            LaunchedEffect(Unit) { localDeviceId.value = wifiAwareService.getDeviceId() }
+
+            // Poll for connected peers periodically
+            LaunchedEffect(permissionsGranted) {
+                if (permissionsGranted) {
+                    while (true) {
+                        connectedPeerIds.clear()
+                        connectedPeerIds.addAll(wifiAwareService.getConnectedPeers())
+                        delay(1000) // Update every second
+                    }
+                }
+            }
 
             // Start discovery only when permissions are granted
             LaunchedEffect(permissionsGranted) {
@@ -47,11 +63,12 @@ fun App(
                     wifiAwareService.startDiscovery { msg ->
                         debugLogs.add("[App] Message received: $msg")
                         println("[App] Message received: $msg")
-                        val message = Message(
-                            content = msg,
-                            isSent = false,
-                            isServiceMessage = msg.startsWith("Service discovered:")
-                        )
+                        val message =
+                                Message(
+                                        content = msg,
+                                        isSent = false,
+                                        isServiceMessage = msg.startsWith("Service discovered:")
+                                )
                         messages.add(message)
                         lastReceivedMessage.value = msg
                     }
@@ -65,11 +82,11 @@ fun App(
             fun refreshDiscovery() {
                 debugLogs.add("[UI] Manual refresh triggered - stopping discovery...")
                 discoveryStatus.value = "Stopping..."
-                
+
                 // Stop existing discovery first
                 wifiAwareService.stopDiscovery()
                 debugLogs.add("[UI] Discovery stopped. Restarting...")
-                
+
                 discoveryStatus.value = "Restarting..."
                 wifiAwareService.startDiscovery { msg ->
                     debugLogs.add("[App] Message received (refresh): $msg")
@@ -103,8 +120,10 @@ fun App(
                 discoveryStatus = discoveryStatus.value,
                 lastReceivedMessage = lastReceivedMessage.value,
                 lastSentMessage = lastSentMessage.value,
-                onRefresh = { refreshDiscovery() }
+                onRefresh = { refreshDiscovery() },
+                localDeviceId = localDeviceId.value,
+                connectedPeerIds = connectedPeerIds.toList()
             )
         }
-    }   
+    }
 }

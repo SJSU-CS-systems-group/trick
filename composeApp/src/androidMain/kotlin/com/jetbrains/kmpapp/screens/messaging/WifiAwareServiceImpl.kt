@@ -42,13 +42,17 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
         manager.stopDiscovery()
     }
 
+    override fun getDeviceId(): String {
+        return manager.getDeviceId()
+    }
+
+    override fun getConnectedPeers(): List<String> {
+        return manager.getConnectedPeers()
+    }
+
     // Additional methods for enhanced functionality
     fun sendMessageToPeer(message: String, peerId: String) {
         Log.d("WifiAwareServiceImpl", "Sending message to specific peer: ${peerId.take(8)}")
         manager.sendMessageToPeer(message, peerId)
-    }
-
-    fun getConnectedPeers(): List<String> {
-        return manager.getConnectedPeers()
     }
 }

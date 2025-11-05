@@ -9,15 +9,14 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.net.ServerSocket
-import java.net.Socket
-import java.util.concurrent.atomic.AtomicBoolean
 import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.*
 
 /**
  * WiFi Aware Manager with full peer-to-peer capabilities
@@ -38,9 +37,7 @@ class AndroidWifiAwareManager(private val context: Context) {
     private var subscribeSession: SubscribeDiscoverySession? = null
 
     // Device identity
-    private val localDeviceId: String by lazy {
-        DeviceIdentity.generateDeviceId(context)
-    }
+    private val localDeviceId: String by lazy { DeviceIdentity.generateDeviceId(context) }
 
     // Connection management
     private val connectionPool = ConnectionPool()
@@ -53,12 +50,14 @@ class AndroidWifiAwareManager(private val context: Context) {
     }
 
     // Coroutines
-    private var scope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO +
-                CoroutineExceptionHandler { _, throwable ->
-                    Log.e(TAG, "Coroutine error", throwable)
-                }
-    )
+    private var scope =
+            CoroutineScope(
+                    SupervisorJob() +
+                            Dispatchers.IO +
+                            CoroutineExceptionHandler { _, throwable ->
+                                Log.e(TAG, "Coroutine error", throwable)
+                            }
+            )
 
     // Callbacks
     private var messageCallback: ((String, String?) -> Unit)? = null // (message, peerId)
@@ -71,12 +70,10 @@ class AndroidWifiAwareManager(private val context: Context) {
         wifiAwareManager = context.getSystemService(Context.WIFI_AWARE_SERVICE) as? WifiAwareManager
     }
 
-    /**
-     * Start discovery and connection establishment
-     */
+    /** Start discovery and connection establishment */
     fun startDiscovery(
-        onMessageReceived: (String, String?) -> Unit,
-        onConnectionStatusChanged: ((String, ConnectionState) -> Unit)? = null
+            onMessageReceived: (String, String?) -> Unit,
+            onConnectionStatusChanged: ((String, ConnectionState) -> Unit)? = null
     ) {
         if (isRunning.getAndSet(true)) {
             Log.w(TAG, "Discovery already running")
@@ -84,12 +81,14 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
 
         // Create a fresh coroutine scope
-        scope = CoroutineScope(
-            SupervisorJob() + Dispatchers.IO +
-                    CoroutineExceptionHandler { _, throwable ->
-                        Log.e(TAG, "Coroutine error", throwable)
-                    }
-        )
+        scope =
+                CoroutineScope(
+                        SupervisorJob() +
+                                Dispatchers.IO +
+                                CoroutineExceptionHandler { _, throwable ->
+                                    Log.e(TAG, "Coroutine error", throwable)
+                                }
+                )
 
         messageCallback = onMessageReceived
         connectionStatusCallback = onConnectionStatusChanged
@@ -106,28 +105,34 @@ class AndroidWifiAwareManager(private val context: Context) {
             return
         }
 
-        Log.d(TAG, "Starting WiFi Aware discovery with device ID: ${DeviceIdentity.getShortId(localDeviceId)}")
+        Log.d(
+                TAG,
+                "Starting WiFi Aware discovery with device ID: ${DeviceIdentity.getShortId(localDeviceId)}"
+        )
 
         try {
-            wifiAwareManager?.attach(object : AttachCallback() {
-                override fun onAttached(wifiSession: WifiAwareSession) {
-                    session = wifiSession
-                    Log.d(TAG, "Attached to WiFi Aware session")
+            wifiAwareManager?.attach(
+                    object : AttachCallback() {
+                        override fun onAttached(wifiSession: WifiAwareSession) {
+                            session = wifiSession
+                            Log.d(TAG, "Attached to WiFi Aware session")
 
-                    // Start both publish and subscribe simultaneously
-                    startPublishing(wifiSession)
-                    startSubscribing(wifiSession)
+                            // Start both publish and subscribe simultaneously
+                            startPublishing(wifiSession)
+                            startSubscribing(wifiSession)
 
-                    // Start heartbeat monitor
-                    startHeartbeatMonitor()
-                }
+                            // Start heartbeat monitor
+                            startHeartbeatMonitor()
+                        }
 
-                override fun onAttachFailed() {
-                    Log.e(TAG, "WiFi Aware attach failed")
-                    notifyMessage("[Error] Failed to attach to WiFi Aware")
-                    isRunning.set(false)
-                }
-            }, Handler(Looper.getMainLooper()))
+                        override fun onAttachFailed() {
+                            Log.e(TAG, "WiFi Aware attach failed")
+                            notifyMessage("[Error] Failed to attach to WiFi Aware")
+                            isRunning.set(false)
+                        }
+                    },
+                    Handler(Looper.getMainLooper())
+            )
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception: ${e.message}", e)
             notifyMessage("[Error] Permission denied")
@@ -135,115 +140,110 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Start publishing service (advertising)
-     */
+    /** Start publishing service (advertising) */
     private fun startPublishing(wifiSession: WifiAwareSession) {
         if (!hasRequiredPermissions()) {
             Log.e(TAG, "Cannot start publishing: missing permissions")
             return
         }
 
-        val publishConfig = PublishConfig.Builder()
-            .setServiceName("KMPChat")
-            .setServiceSpecificInfo(localDeviceId.toByteArray())
-            .build()
+        val publishConfig =
+                PublishConfig.Builder()
+                        .setServiceName("KMPChat")
+                        .setServiceSpecificInfo(localDeviceId.toByteArray())
+                        .build()
 
         try {
             wifiSession.publish(
-                publishConfig,
-                object : DiscoverySessionCallback() {
-                override fun onPublishStarted(session: PublishDiscoverySession) {
-                    publishSession = session
-                    Log.d(TAG, "Publishing started")
-                }
+                    publishConfig,
+                    object : DiscoverySessionCallback() {
+                        override fun onPublishStarted(session: PublishDiscoverySession) {
+                            publishSession = session
+                            Log.d(TAG, "Publishing started")
+                        }
 
-                override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
-                    handleDiscoveryMessage(peerHandle, message, isFromPublish = true)
-                }
+                        override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
+                            handleDiscoveryMessage(peerHandle, message, isFromPublish = true)
+                        }
 
-                override fun onMessageSendSucceeded(messageId: Int) {
-                    Log.d(TAG, "Publish message sent: ID $messageId")
-                }
+                        override fun onMessageSendSucceeded(messageId: Int) {
+                            Log.d(TAG, "Publish message sent: ID $messageId")
+                        }
 
-                override fun onMessageSendFailed(messageId: Int) {
-                    Log.e(TAG, "Publish message send failed: ID $messageId")
-                }
+                        override fun onMessageSendFailed(messageId: Int) {
+                            Log.e(TAG, "Publish message send failed: ID $messageId")
+                        }
 
-                override fun onSessionTerminated() {
-                    Log.w(TAG, "Publish session terminated")
-                }
-            },
-            Handler(Looper.getMainLooper())
-        )
+                        override fun onSessionTerminated() {
+                            Log.w(TAG, "Publish session terminated")
+                        }
+                    },
+                    Handler(Looper.getMainLooper())
+            )
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception in publish: ${e.message}", e)
             notifyMessage("[Error] Permission denied for publishing")
         }
     }
 
-    /**
-     * Start subscribing to service (discovering)
-     */
+    /** Start subscribing to service (discovering) */
     private fun startSubscribing(wifiSession: WifiAwareSession) {
         if (!hasRequiredPermissions()) {
             Log.e(TAG, "Cannot start subscribing: missing permissions")
             return
         }
 
-        val subscribeConfig = SubscribeConfig.Builder()
-            .setServiceName("KMPChat")
-            .build()
+        val subscribeConfig = SubscribeConfig.Builder().setServiceName("KMPChat").build()
 
         try {
             wifiSession.subscribe(
-                subscribeConfig,
-                object : DiscoverySessionCallback() {
-                override fun onSubscribeStarted(session: SubscribeDiscoverySession) {
-                    subscribeSession = session
-                    Log.d(TAG, "Subscribing started")
-                }
+                    subscribeConfig,
+                    object : DiscoverySessionCallback() {
+                        override fun onSubscribeStarted(session: SubscribeDiscoverySession) {
+                            subscribeSession = session
+                            Log.d(TAG, "Subscribing started")
+                        }
 
-                override fun onServiceDiscovered(
-                    peerHandle: PeerHandle,
-                    serviceSpecificInfo: ByteArray?,
-                    matchFilter: List<ByteArray>?
-                ) {
-                    handleServiceDiscovered(peerHandle, serviceSpecificInfo)
-                }
+                        override fun onServiceDiscovered(
+                                peerHandle: PeerHandle,
+                                serviceSpecificInfo: ByteArray?,
+                                matchFilter: List<ByteArray>?
+                        ) {
+                            handleServiceDiscovered(peerHandle, serviceSpecificInfo)
+                        }
 
-                override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
-                    handleDiscoveryMessage(peerHandle, message, isFromPublish = false)
-                }
+                        override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
+                            handleDiscoveryMessage(peerHandle, message, isFromPublish = false)
+                        }
 
-                override fun onMessageSendSucceeded(messageId: Int) {
-                    Log.d(TAG, "Subscribe message sent: ID $messageId")
-                }
+                        override fun onMessageSendSucceeded(messageId: Int) {
+                            Log.d(TAG, "Subscribe message sent: ID $messageId")
+                        }
 
-                override fun onMessageSendFailed(messageId: Int) {
-                    Log.e(TAG, "Subscribe message send failed: ID $messageId")
-                }
+                        override fun onMessageSendFailed(messageId: Int) {
+                            Log.e(TAG, "Subscribe message send failed: ID $messageId")
+                        }
 
-                override fun onSessionTerminated() {
-                    Log.w(TAG, "Subscribe session terminated")
-                }
-            },
-            Handler(Looper.getMainLooper())
-        )
+                        override fun onSessionTerminated() {
+                            Log.w(TAG, "Subscribe session terminated")
+                        }
+                    },
+                    Handler(Looper.getMainLooper())
+            )
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception in subscribe: ${e.message}", e)
             notifyMessage("[Error] Permission denied for subscribing")
         }
     }
 
-    /**
-     * Handle service discovery event
-     */
+    /** Handle service discovery event */
     private fun handleServiceDiscovered(peerHandle: PeerHandle, serviceSpecificInfo: ByteArray?) {
-        val remoteDeviceId = serviceSpecificInfo?.let { String(it) } ?: run {
-            Log.w(TAG, "Service discovered but no device ID provided")
-            return
-        }
+        val remoteDeviceId =
+                serviceSpecificInfo?.let { String(it) }
+                        ?: run {
+                            Log.w(TAG, "Service discovered but no device ID provided")
+                            return
+                        }
 
         Log.d(TAG, "Service discovered from peer: ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
@@ -264,7 +264,10 @@ class AndroidWifiAwareManager(private val context: Context) {
         when (role) {
             Role.SERVER -> {
                 // As server, wait for client's handshake
-                Log.d(TAG, "Waiting for handshake from client ${DeviceIdentity.getShortId(remoteDeviceId)}")
+                Log.d(
+                        TAG,
+                        "Waiting for handshake from client ${DeviceIdentity.getShortId(remoteDeviceId)}"
+                )
             }
             Role.CLIENT -> {
                 // As client, send handshake to initiate connection
@@ -278,10 +281,12 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Handle messages received during discovery phase
-     */
-    private fun handleDiscoveryMessage(peerHandle: PeerHandle, message: ByteArray, isFromPublish: Boolean) {
+    /** Handle messages received during discovery phase */
+    private fun handleDiscoveryMessage(
+            peerHandle: PeerHandle,
+            message: ByteArray,
+            isFromPublish: Boolean
+    ) {
         val messageStr = String(message)
         val source = if (isFromPublish) "publish" else "subscribe"
         Log.d(TAG, "Discovery message from $source: $messageStr")
@@ -315,9 +320,7 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Send handshake to peer (client role)
-     */
+    /** Send handshake to peer (client role) */
     private fun sendHandshake(peerHandle: PeerHandle, remoteDeviceId: String) {
         if (pendingHandshakes.contains(peerHandle)) {
             Log.d(TAG, "Handshake already pending for ${DeviceIdentity.getShortId(remoteDeviceId)}")
@@ -330,17 +333,15 @@ class AndroidWifiAwareManager(private val context: Context) {
         Log.d(TAG, "Sending handshake to ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
         subscribeSession?.sendMessage(
-            peerHandle,
-            System.currentTimeMillis().toInt(),
-            handshakeMessage.toByteArray()
+                peerHandle,
+                System.currentTimeMillis().toInt(),
+                handshakeMessage.toByteArray()
         )
 
         notifyConnectionStatus(remoteDeviceId, ConnectionState.NEGOTIATING)
     }
 
-    /**
-     * Handle handshake received (server role)
-     */
+    /** Handle handshake received (server role) */
     private fun handleHandshakeReceived(peerHandle: PeerHandle, remoteDeviceId: String) {
         Log.d(TAG, "Handshake received from ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
@@ -362,22 +363,19 @@ class AndroidWifiAwareManager(private val context: Context) {
         notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTING)
 
         // Setup as server
-        scope.launch {
-            setupServerConnection(peerHandle, remoteDeviceId)
-        }
+        scope.launch { setupServerConnection(peerHandle, remoteDeviceId) }
     }
 
-    /**
-     * Setup server-side connection
-     */
+    /** Setup server-side connection */
     private suspend fun setupServerConnection(peerHandle: PeerHandle, remoteDeviceId: String) {
         try {
-            Log.d(TAG, "[Server] Setting up connection for ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            Log.d(
+                    TAG,
+                    "[Server] Setting up connection for ${DeviceIdentity.getShortId(remoteDeviceId)}"
+            )
 
             // Create server socket (port 0 = auto-assign)
-            val serverSocket = withContext(Dispatchers.IO) {
-                ServerSocket(0)
-            }
+            val serverSocket = withContext(Dispatchers.IO) { ServerSocket(0) }
             val assignedPort = serverSocket.localPort
 
             Log.d(TAG, "[Server] ServerSocket created on port $assignedPort")
@@ -385,25 +383,27 @@ class AndroidWifiAwareManager(private val context: Context) {
             // Send port to client
             val portMessage = DeviceIdentity.createPortMessage(assignedPort)
             publishSession?.sendMessage(
-                peerHandle,
-                System.currentTimeMillis().toInt(),
-                portMessage.toByteArray()
+                    peerHandle,
+                    System.currentTimeMillis().toInt(),
+                    portMessage.toByteArray()
             )
 
             Log.d(TAG, "[Server] Port message sent to client: $assignedPort")
 
             // Create network specifier with port
             val session = publishSession ?: throw Exception("Publish session is null")
-            val networkSpecifier = WifiAwareNetworkSpecifier.Builder(session, peerHandle)
-                .setPskPassphrase(DeviceIdentity.getPskPassphrase())
-                .setPort(assignedPort)
-                .build()
+            val networkSpecifier =
+                    WifiAwareNetworkSpecifier.Builder(session, peerHandle)
+                            .setPskPassphrase(DeviceIdentity.getPskPassphrase())
+                            .setPort(assignedPort)
+                            .build()
 
             // Create network request
-            val networkRequest = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
-                .setNetworkSpecifier(networkSpecifier)
-                .build()
+            val networkRequest =
+                    NetworkRequest.Builder()
+                            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                            .setNetworkSpecifier(networkSpecifier)
+                            .build()
 
             // Track network and callback
             var network: Network? = null
@@ -412,30 +412,31 @@ class AndroidWifiAwareManager(private val context: Context) {
             // Request network
             val callbackDeferred = CompletableDeferred<Network>()
 
-            networkCallback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(net: Network) {
-                    Log.d(TAG, "[Server] Network available")
-                    network = net
-                    callbackDeferred.complete(net)
-                }
+            networkCallback =
+                    object : ConnectivityManager.NetworkCallback() {
+                        override fun onAvailable(net: Network) {
+                            Log.d(TAG, "[Server] Network available")
+                            network = net
+                            callbackDeferred.complete(net)
+                        }
 
-                override fun onCapabilitiesChanged(
-                    net: Network,
-                    capabilities: NetworkCapabilities
-                ) {
-                    Log.d(TAG, "[Server] Network capabilities changed")
-                }
+                        override fun onCapabilitiesChanged(
+                                net: Network,
+                                capabilities: NetworkCapabilities
+                        ) {
+                            Log.d(TAG, "[Server] Network capabilities changed")
+                        }
 
-                override fun onLost(net: Network) {
-                    Log.w(TAG, "[Server] Network lost")
-                    handleConnectionLost(remoteDeviceId)
-                }
+                        override fun onLost(net: Network) {
+                            Log.w(TAG, "[Server] Network lost")
+                            handleConnectionLost(remoteDeviceId)
+                        }
 
-                override fun onUnavailable() {
-                    Log.e(TAG, "[Server] Network unavailable")
-                    callbackDeferred.completeExceptionally(Exception("Network unavailable"))
-                }
-            }
+                        override fun onUnavailable() {
+                            Log.e(TAG, "[Server] Network unavailable")
+                            callbackDeferred.completeExceptionally(Exception("Network unavailable"))
+                        }
+                    }
 
             connectivityManager.requestNetwork(networkRequest, networkCallback)
 
@@ -445,9 +446,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             Log.d(TAG, "[Server] Waiting for client connection on port $assignedPort")
 
             // Accept client connection
-            val clientSocket = withContext(Dispatchers.IO) {
-                serverSocket.accept()
-            }
+            val clientSocket = withContext(Dispatchers.IO) { serverSocket.accept() }
 
             Log.d(TAG, "[Server] Client connected: ${clientSocket.remoteSocketAddress}")
 
@@ -456,29 +455,35 @@ class AndroidWifiAwareManager(private val context: Context) {
             val writer = BufferedWriter(OutputStreamWriter(clientSocket.getOutputStream()))
 
             // Create connection object
-            val connection = PeerConnection(
-                peerId = remoteDeviceId,
-                peerHandle = peerHandle,
-                role = Role.SERVER,
-                socket = clientSocket,
-                serverSocket = serverSocket,
-                reader = reader,
-                writer = writer,
-                network = network,
-                networkCallback = networkCallback
-            )
+            val connection =
+                    PeerConnection(
+                            peerId = remoteDeviceId,
+                            peerHandle = peerHandle,
+                            role = Role.SERVER,
+                            socket = clientSocket,
+                            serverSocket = serverSocket,
+                            reader = reader,
+                            writer = writer,
+                            network = network,
+                            networkCallback = networkCallback
+                    )
 
             // Add to pool
             connectionPool.addConnection(remoteDeviceId, connection)
             pendingHandshakes.remove(peerHandle)
 
-            Log.d(TAG, "[Server] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            Log.d(
+                    TAG,
+                    "[Server] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}"
+            )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
-            notifyMessage("[System] Connected as SERVER to ${DeviceIdentity.getShortId(remoteDeviceId)}", remoteDeviceId)
+            notifyMessage(
+                    "[System] Connected as SERVER to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    remoteDeviceId
+            )
 
             // Start message listener
             startMessageListener(remoteDeviceId)
-
         } catch (e: Exception) {
             Log.e(TAG, "[Server] Connection setup failed: ${e.message}", e)
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
@@ -487,41 +492,68 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Handle port received (client role)
-     */
+    /** Handle port received (client role) */
     private fun handlePortReceived(peerHandle: PeerHandle, remoteDeviceId: String, port: Int) {
         Log.d(TAG, "[Client] Port received from server: $port")
 
+        // Check if already connected
+        if (connectionPool.hasConnection(remoteDeviceId)) {
+            Log.d(
+                    TAG,
+                    "[Client] Already connected to ${DeviceIdentity.getShortId(remoteDeviceId)}, ignoring port message"
+            )
+            return
+        }
+
+        // Check if subscribe session is ready
+        if (subscribeSession == null) {
+            Log.e(TAG, "[Client] Subscribe session not available - this should not happen")
+            notifyMessage(
+                    "[Error] Client connection failed: Subscribe session not available",
+                    remoteDeviceId
+            )
+            return
+        }
+
         notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTING)
 
-        scope.launch {
-            setupClientConnection(peerHandle, remoteDeviceId, port)
-        }
+        scope.launch { setupClientConnection(peerHandle, remoteDeviceId, port) }
     }
 
-    /**
-     * Setup client-side connection
-     */
+    /** Setup client-side connection */
     private suspend fun setupClientConnection(
-        peerHandle: PeerHandle,
-        remoteDeviceId: String,
-        serverPort: Int
+            peerHandle: PeerHandle,
+            remoteDeviceId: String,
+            serverPort: Int
     ) {
         try {
-            Log.d(TAG, "[Client] Setting up connection to ${DeviceIdentity.getShortId(remoteDeviceId)} on port $serverPort")
+            // Double-check connection doesn't already exist
+            if (connectionPool.hasConnection(remoteDeviceId)) {
+                Log.d(
+                        TAG,
+                        "[Client] Connection already exists for ${DeviceIdentity.getShortId(remoteDeviceId)}"
+                )
+                return
+            }
+
+            Log.d(
+                    TAG,
+                    "[Client] Setting up connection to ${DeviceIdentity.getShortId(remoteDeviceId)} on port $serverPort"
+            )
 
             // Create network specifier (client doesn't specify port)
             val session = subscribeSession ?: throw Exception("Subscribe session is null")
-            val networkSpecifier = WifiAwareNetworkSpecifier.Builder(session, peerHandle)
-                .setPskPassphrase(DeviceIdentity.getPskPassphrase())
-                .build()
+            val networkSpecifier =
+                    WifiAwareNetworkSpecifier.Builder(session, peerHandle)
+                            .setPskPassphrase(DeviceIdentity.getPskPassphrase())
+                            .build()
 
             // Create network request
-            val networkRequest = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
-                .setNetworkSpecifier(networkSpecifier)
-                .build()
+            val networkRequest =
+                    NetworkRequest.Builder()
+                            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                            .setNetworkSpecifier(networkSpecifier)
+                            .build()
 
             // Track network and callback
             var network: Network? = null
@@ -530,54 +562,80 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             val callbackDeferred = CompletableDeferred<Pair<Network, String>>()
 
-            networkCallback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(net: Network) {
-                    Log.d(TAG, "[Client] Network available")
-                    network = net
-                }
+            networkCallback =
+                    object : ConnectivityManager.NetworkCallback() {
+                        override fun onAvailable(net: Network) {
+                            Log.d(TAG, "[Client] Network available")
+                            network = net
+                        }
 
-                override fun onCapabilitiesChanged(
-                    net: Network,
-                    capabilities: NetworkCapabilities
-                ) {
-                    Log.d(TAG, "[Client] Network capabilities changed")
+                        override fun onCapabilitiesChanged(
+                                net: Network,
+                                capabilities: NetworkCapabilities
+                        ) {
+                            Log.d(TAG, "[Client] Network capabilities changed")
 
-                    // Extract server IPv6 address
-                    val wifiAwareInfo = capabilities.transportInfo as? WifiAwareNetworkInfo
-                    val ipv6 = wifiAwareInfo?.peerIpv6Addr
-                    val port = wifiAwareInfo?.port
+                            // Extract server IPv6 address
+                            val wifiAwareInfo = capabilities.transportInfo as? WifiAwareNetworkInfo
+                            val ipv6 = wifiAwareInfo?.peerIpv6Addr
+                            val port = wifiAwareInfo?.port
 
-                    if (ipv6 != null && network != null) {
-                        Log.d(TAG, "[Client] Server IPv6: $ipv6, Port: $port")
-                        serverIpv6 = ipv6.hostAddress
-                        callbackDeferred.complete(Pair(network!!, serverIpv6!!))
+                            if (ipv6 != null && network != null && !callbackDeferred.isCompleted) {
+                                Log.d(TAG, "[Client] Server IPv6: $ipv6, Port: $port")
+                                serverIpv6 = ipv6.hostAddress
+                                callbackDeferred.complete(Pair(network!!, serverIpv6!!))
+                            }
+                        }
+
+                        override fun onLost(net: Network) {
+                            Log.w(TAG, "[Client] Network lost")
+                            if (!callbackDeferred.isCompleted) {
+                                callbackDeferred.completeExceptionally(Exception("Network lost"))
+                            }
+                            handleConnectionLost(remoteDeviceId)
+                        }
+
+                        override fun onUnavailable() {
+                            Log.e(TAG, "[Client] Network unavailable")
+                            if (!callbackDeferred.isCompleted) {
+                                callbackDeferred.completeExceptionally(
+                                        Exception("Network unavailable")
+                                )
+                            }
+                        }
                     }
-                }
-
-                override fun onLost(net: Network) {
-                    Log.w(TAG, "[Client] Network lost")
-                    handleConnectionLost(remoteDeviceId)
-                }
-
-                override fun onUnavailable() {
-                    Log.e(TAG, "[Client] Network unavailable")
-                    callbackDeferred.completeExceptionally(Exception("Network unavailable"))
-                }
-            }
 
             connectivityManager.requestNetwork(networkRequest, networkCallback)
 
-            // Wait for network and IPv6
-            val (net, ipv6) = callbackDeferred.await()
+            // Wait for network and IPv6 with timeout
+            val (net, ipv6) =
+                    try {
+                        withTimeoutOrNull(15000) { // 15 second timeout
+                            callbackDeferred.await()
+                        }
+                                ?: run {
+                                    connectivityManager.unregisterNetworkCallback(networkCallback)
+                                    throw Exception("Network connection timeout")
+                                }
+                    } catch (e: Exception) {
+                        connectivityManager.unregisterNetworkCallback(networkCallback)
+                        throw e
+                    }
 
             Log.d(TAG, "[Client] Connecting to server at [$ipv6]:$serverPort")
 
             // Create socket connection
-            val socket = withContext(Dispatchers.IO) {
-                val sock = net.socketFactory.createSocket()
-                sock.connect(InetSocketAddress(ipv6, serverPort), 10000)
-                sock
-            }
+            val socket =
+                    try {
+                        withContext(Dispatchers.IO) {
+                            val sock = net.socketFactory.createSocket()
+                            sock.connect(InetSocketAddress(ipv6, serverPort), 10000)
+                            sock
+                        }
+                    } catch (e: Exception) {
+                        connectivityManager.unregisterNetworkCallback(networkCallback)
+                        throw e
+                    }
 
             Log.d(TAG, "[Client] Connected to server: ${socket.remoteSocketAddress}")
 
@@ -586,29 +644,35 @@ class AndroidWifiAwareManager(private val context: Context) {
             val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream()))
 
             // Create connection object
-            val connection = PeerConnection(
-                peerId = remoteDeviceId,
-                peerHandle = peerHandle,
-                role = Role.CLIENT,
-                socket = socket,
-                serverSocket = null,
-                reader = reader,
-                writer = writer,
-                network = network,
-                networkCallback = networkCallback
-            )
+            val connection =
+                    PeerConnection(
+                            peerId = remoteDeviceId,
+                            peerHandle = peerHandle,
+                            role = Role.CLIENT,
+                            socket = socket,
+                            serverSocket = null,
+                            reader = reader,
+                            writer = writer,
+                            network = network,
+                            networkCallback = networkCallback
+                    )
 
             // Add to pool
             connectionPool.addConnection(remoteDeviceId, connection)
             pendingHandshakes.remove(peerHandle)
 
-            Log.d(TAG, "[Client] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            Log.d(
+                    TAG,
+                    "[Client] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}"
+            )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
-            notifyMessage("[System] Connected as CLIENT to ${DeviceIdentity.getShortId(remoteDeviceId)}", remoteDeviceId)
+            notifyMessage(
+                    "[System] Connected as CLIENT to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    remoteDeviceId
+            )
 
             // Start message listener
             startMessageListener(remoteDeviceId)
-
         } catch (e: Exception) {
             Log.e(TAG, "[Client] Connection setup failed: ${e.message}", e)
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
@@ -617,20 +681,25 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Start listening for messages from a peer
-     */
+    /** Start listening for messages from a peer */
     private fun startMessageListener(peerId: String) {
         scope.launch(Dispatchers.IO) {
-            val connection = connectionPool.getConnection(peerId) ?: run {
-                Log.e(TAG, "Cannot start listener: connection not found for $peerId")
-                return@launch
-            }
+            val connection =
+                    connectionPool.getConnection(peerId)
+                            ?: run {
+                                Log.e(
+                                        TAG,
+                                        "Cannot start listener: connection not found for $peerId"
+                                )
+                                return@launch
+                            }
 
-            val reader = connection.reader ?: run {
-                Log.e(TAG, "Cannot start listener: reader is null")
-                return@launch
-            }
+            val reader =
+                    connection.reader
+                            ?: run {
+                                Log.e(TAG, "Cannot start listener: reader is null")
+                                return@launch
+                            }
 
             Log.d(TAG, "Message listener started for ${DeviceIdentity.getShortId(peerId)}")
 
@@ -652,12 +721,13 @@ class AndroidWifiAwareManager(private val context: Context) {
                         continue
                     }
 
-                    Log.d(TAG, "Message received from ${DeviceIdentity.getShortId(peerId)}: $message")
+                    Log.d(
+                            TAG,
+                            "Message received from ${DeviceIdentity.getShortId(peerId)}: $message"
+                    )
 
                     // Notify on main thread
-                    withContext(Dispatchers.Main) {
-                        messageCallback?.invoke(message, peerId)
-                    }
+                    withContext(Dispatchers.Main) { messageCallback?.invoke(message, peerId) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Message listener error for $peerId: ${e.message}")
@@ -668,9 +738,7 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Send message to specific peer or broadcast to all
-     */
+    /** Send message to specific peer or broadcast to all */
     fun sendMessage(message: String, targetPeerId: String? = null) {
         if (targetPeerId != null) {
             sendMessageToPeer(message, targetPeerId)
@@ -679,9 +747,7 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Send message to specific peer
-     */
+    /** Send message to specific peer */
     fun sendMessageToPeer(message: String, peerId: String) {
         scope.launch(Dispatchers.IO) {
             val connection = connectionPool.getConnection(peerId)
@@ -689,7 +755,10 @@ class AndroidWifiAwareManager(private val context: Context) {
             if (connection == null) {
                 Log.e(TAG, "Cannot send: no connection to ${DeviceIdentity.getShortId(peerId)}")
                 withContext(Dispatchers.Main) {
-                    notifyMessage("[Error] Not connected to ${DeviceIdentity.getShortId(peerId)}", null)
+                    notifyMessage(
+                            "[Error] Not connected to ${DeviceIdentity.getShortId(peerId)}",
+                            null
+                    )
                 }
                 return@launch
             }
@@ -705,7 +774,6 @@ class AndroidWifiAwareManager(private val context: Context) {
                 connection.updateLastMessageTime()
 
                 Log.d(TAG, "Message sent to ${DeviceIdentity.getShortId(peerId)}: $message")
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message to $peerId: ${e.message}", e)
                 withContext(Dispatchers.Main) {
@@ -716,21 +784,15 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Broadcast message to all connected peers
-     */
+    /** Broadcast message to all connected peers */
     fun broadcastMessage(message: String) {
         val peers = connectionPool.getAllConnections()
         Log.d(TAG, "Broadcasting message to ${peers.size} peers")
 
-        peers.forEach { connection ->
-            sendMessageToPeer(message, connection.peerId)
-        }
+        peers.forEach { connection -> sendMessageToPeer(message, connection.peerId) }
     }
 
-    /**
-     * Handle connection loss
-     */
+    /** Handle connection loss */
     private fun handleConnectionLost(peerId: String) {
         val connection = connectionPool.removeConnection(peerId) ?: return
 
@@ -763,9 +825,7 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Start heartbeat monitor
-     */
+    /** Start heartbeat monitor */
     private fun startHeartbeatMonitor() {
         scope.launch {
             while (isActive && isRunning.get()) {
@@ -780,7 +840,10 @@ class AndroidWifiAwareManager(private val context: Context) {
 
                         // Check health
                         if (!connection.isHealthy()) {
-                            Log.w(TAG, "Unhealthy connection detected: ${DeviceIdentity.getShortId(connection.peerId)}")
+                            Log.w(
+                                    TAG,
+                                    "Unhealthy connection detected: ${DeviceIdentity.getShortId(connection.peerId)}"
+                            )
                             handleConnectionLost(connection.peerId)
                         }
                     } catch (e: Exception) {
@@ -791,23 +854,17 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Get connected peer IDs
-     */
+    /** Get connected peer IDs */
     fun getConnectedPeers(): List<String> {
         return connectionPool.getPeerIds()
     }
 
-    /**
-     * Check if specific peer is connected
-     */
+    /** Check if specific peer is connected */
     fun isPeerConnected(peerId: String): Boolean {
         return connectionPool.hasConnection(peerId)
     }
 
-    /**
-     * Get connection status summary
-     */
+    /** Get connection status summary */
     fun getConnectionStatus(): String {
         val stats = connectionPool.getStatistics()
         return buildString {
@@ -818,14 +875,10 @@ class AndroidWifiAwareManager(private val context: Context) {
         }
     }
 
-    /**
-     * Get local device ID
-     */
+    /** Get local device ID */
     fun getDeviceId(): String = localDeviceId
 
-    /**
-     * Stop discovery and cleanup all connections
-     */
+    /** Stop discovery and cleanup all connections */
     fun stopDiscovery() {
         if (!isRunning.getAndSet(false)) {
             return
@@ -857,34 +910,25 @@ class AndroidWifiAwareManager(private val context: Context) {
         Log.d(TAG, "Cleanup complete")
     }
 
-    /**
-     * Helper to notify message callback
-     */
+    /** Helper to notify message callback */
     private fun notifyMessage(message: String, peerId: String? = null) {
-        scope.launch(Dispatchers.Main) {
-            messageCallback?.invoke(message, peerId)
-        }
+        scope.launch(Dispatchers.Main) { messageCallback?.invoke(message, peerId) }
     }
 
-    /**
-     * Helper to notify connection status callback
-     */
+    /** Helper to notify connection status callback */
     private fun notifyConnectionStatus(peerId: String, state: ConnectionState) {
-        scope.launch(Dispatchers.Main) {
-            connectionStatusCallback?.invoke(peerId, state)
-        }
+        scope.launch(Dispatchers.Main) { connectionStatusCallback?.invoke(peerId, state) }
     }
 
-    /**
-     * Check if required permissions are granted
-     */
+    /** Check if required permissions are granted */
     private fun hasRequiredPermissions(): Boolean {
-        val perms = listOf(
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.NEARBY_WIFI_DEVICES
-        )
+        val perms =
+                listOf(
+                        Manifest.permission.ACCESS_WIFI_STATE,
+                        Manifest.permission.CHANGE_WIFI_STATE,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.NEARBY_WIFI_DEVICES
+                )
         return perms.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }

@@ -1,32 +1,33 @@
 package com.jetbrains.kmpapp.screens.messaging
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 
-data class Message(
-    val content: String,
-    val isSent: Boolean,
-    val isServiceMessage: Boolean = false
-)
+data class Message(val content: String, val isSent: Boolean, val isServiceMessage: Boolean = false)
+
+// Helper function to get short ID (first 8 characters)
+fun getShortDeviceId(deviceId: String): String {
+    return if (deviceId.length >= 8) {
+        deviceId.substring(0, 8)
+    } else {
+        deviceId
+    }
+}
 
 @Composable
 fun MessagingScreen(
@@ -36,33 +37,31 @@ fun MessagingScreen(
     discoveryStatus: String,
     lastReceivedMessage: String,
     lastSentMessage: String,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    localDeviceId: String,
+    connectedPeerIds: List<String>
 ) {
     var text by remember { mutableStateOf("") }
+    var showFullDeviceId by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    
+
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
-    
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
     ) {
-        // Header with status
+        // Header with status and device IDs
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -70,10 +69,73 @@ fun MessagingScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Device ID section
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Your ID: ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text =
+                            if (showFullDeviceId) localDeviceId
+                            else getShortDeviceId(localDeviceId),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        modifier =
+                            Modifier.weight(1f).clickable {
+                                showFullDeviceId = !showFullDeviceId
+                            }
+                    )
+                    TextButton(
+                        onClick = { showFullDeviceId = !showFullDeviceId },
+                        modifier = Modifier.height(24.dp)
+                    ) { Text(text = if (showFullDeviceId) "Less" else "More", fontSize = 10.sp) }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Connected peers section
+                if (connectedPeerIds.isNotEmpty()) {
+                    Column {
+                        Text(
+                            text = "Connected to:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        connectedPeerIds.forEach { peerId ->
+                            Text(
+                                text = "  • ${getShortDeviceId(peerId)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color =
+                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                                        alpha = 0.8f
+                                    )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    Text(
+                        text = "No peers connected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Status row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Status: $discoveryStatus",
@@ -88,35 +150,30 @@ fun MessagingScreen(
                 }
             }
         }
-        
+
         // Messages list
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(messages) { message ->
                 MessageBubble(message = message)
             }
         }
-        
+
         // Debug logs (collapsible)
         var showDebugLogs by remember { mutableStateOf(false) }
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
         ) {
             Column {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -129,7 +186,7 @@ fun MessagingScreen(
                         Text(if (showDebugLogs) "Hide" else "Show")
                     }
                 }
-                
+
                 if (showDebugLogs) {
                     LazyColumn(
                         modifier = Modifier.height(120.dp),
@@ -147,15 +204,15 @@ fun MessagingScreen(
                 }
             }
         }
-        
+
         // Message input
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
         ) {
             Row(
                 modifier = Modifier.padding(8.dp),
@@ -177,9 +234,7 @@ fun MessagingScreen(
                         }
                     },
                     enabled = text.isNotBlank()
-                ) {
-                    Text("Send")
-                }
+                ) { Text("Send") }
             }
         }
     }
@@ -189,7 +244,7 @@ fun MessagingScreen(
 private fun MessageBubble(message: Message) {
     val isSystemMessage = message.content.startsWith("[System]")
     val isErrorMessage = message.content.startsWith("[Error]")
-    
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = when {
@@ -200,16 +255,17 @@ private fun MessageBubble(message: Message) {
     ) {
         Card(
             modifier = Modifier.widthIn(max = 280.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = when {
-                    isErrorMessage -> MaterialTheme.colorScheme.errorContainer
-                    isSystemMessage -> MaterialTheme.colorScheme.tertiaryContainer
-                    message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
-                    message.isSent -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
-            ),
-            shape = RoundedCornerShape(16.dp)
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = when {
+                        isErrorMessage -> MaterialTheme.colorScheme.errorContainer
+                        isSystemMessage -> MaterialTheme.colorScheme.tertiaryContainer
+                        message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
+                        message.isSent -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ),
+                shape = RoundedCornerShape(16.dp)
         ) {
             Text(
                 text = message.content,
