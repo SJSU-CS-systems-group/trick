@@ -187,10 +187,13 @@ fun MessagingScreen(
 
 @Composable
 private fun MessageBubble(message: Message) {
+    val isSystemMessage = message.content.startsWith("[System]")
+    val isErrorMessage = message.content.startsWith("[Error]")
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = when {
-            message.isServiceMessage -> Arrangement.Center
+            message.isServiceMessage || isSystemMessage || isErrorMessage -> Arrangement.Center
             message.isSent -> Arrangement.End
             else -> Arrangement.Start
         }
@@ -199,6 +202,8 @@ private fun MessageBubble(message: Message) {
             modifier = Modifier.widthIn(max = 280.dp),
             colors = CardDefaults.cardColors(
                 containerColor = when {
+                    isErrorMessage -> MaterialTheme.colorScheme.errorContainer
+                    isSystemMessage -> MaterialTheme.colorScheme.tertiaryContainer
                     message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
                     message.isSent -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.surfaceVariant
@@ -210,6 +215,8 @@ private fun MessageBubble(message: Message) {
                 text = message.content,
                 modifier = Modifier.padding(12.dp),
                 color = when {
+                    isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
+                    isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
                     message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
                     message.isSent -> MaterialTheme.colorScheme.onPrimary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
