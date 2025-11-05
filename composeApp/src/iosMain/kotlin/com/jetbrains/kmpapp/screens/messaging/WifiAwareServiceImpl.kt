@@ -25,5 +25,13 @@ class WifiAwareServiceImpl : WifiAwareService {
     override fun getConnectionStatus(): String {
         return "iOS platform (WiFi Aware not supported)"
     }
+
+    override fun getDeviceId(): String {
+        return "ios-device-not-supported"
+    }
+
+    override fun getConnectedPeers(): List<String> {
+        return emptyList()
+    }
 }
 
