@@ -31,15 +31,15 @@ fun getShortDeviceId(deviceId: String): String {
 
 @Composable
 fun MessagingScreen(
-        messages: List<Message>,
-        onSend: (String) -> Unit,
-        debugLogs: List<String>,
-        discoveryStatus: String,
-        lastReceivedMessage: String,
-        lastSentMessage: String,
-        onRefresh: () -> Unit,
-        localDeviceId: String,
-        connectedPeerIds: List<String>
+    messages: List<Message>,
+    onSend: (String) -> Unit,
+    debugLogs: List<String>,
+    discoveryStatus: String,
+    lastReceivedMessage: String,
+    lastSentMessage: String,
+    onRefresh: () -> Unit,
+    localDeviceId: String,
+    connectedPeerIds: List<String>
 ) {
     var text by remember { mutableStateOf("") }
     var showFullDeviceId by remember { mutableStateOf(false) }
@@ -53,49 +53,48 @@ fun MessagingScreen(
     }
 
     Column(
-            modifier =
-                    Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
     ) {
         // Header with status and device IDs
         Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                colors =
-                        CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                        text = "WiFi Aware Chat",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                    text = "WiFi Aware Chat",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Device ID section
                 Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                            text = "Your ID: ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                        text = "Your ID: ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
                     )
                     Text(
-                            text =
-                                    if (showFullDeviceId) localDeviceId
-                                    else getShortDeviceId(localDeviceId),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            modifier =
-                                    Modifier.weight(1f).clickable {
-                                        showFullDeviceId = !showFullDeviceId
-                                    }
+                        text =
+                            if (showFullDeviceId) localDeviceId
+                            else getShortDeviceId(localDeviceId),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        modifier =
+                            Modifier.weight(1f).clickable {
+                                showFullDeviceId = !showFullDeviceId
+                            }
                     )
                     TextButton(
-                            onClick = { showFullDeviceId = !showFullDeviceId },
-                            modifier = Modifier.height(24.dp)
+                        onClick = { showFullDeviceId = !showFullDeviceId },
+                        modifier = Modifier.height(24.dp)
                     ) { Text(text = if (showFullDeviceId) "Less" else "More", fontSize = 10.sp) }
                 }
 
@@ -105,44 +104,47 @@ fun MessagingScreen(
                 if (connectedPeerIds.isNotEmpty()) {
                     Column {
                         Text(
-                                text = "Connected to:",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
+                            text = "Connected to:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         connectedPeerIds.forEach { peerId ->
                             Text(
-                                    text = "  • ${getShortDeviceId(peerId)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color =
-                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                                                    alpha = 0.8f
-                                            )
+                                text = "  • ${getShortDeviceId(peerId)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color =
+                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                                        alpha = 0.8f
+                                    )
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 } else {
                     Text(
-                            text = "No peers connected",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
+                        text = "No peers connected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Status row
                 Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                            text = "Status: $discoveryStatus",
-                            style = MaterialTheme.typography.bodyMedium
+                        text = "Status: $discoveryStatus",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                    Button(onClick = { onRefresh() }, modifier = Modifier.height(32.dp)) {
+                    Button(
+                        onClick = { onRefresh() },
+                        modifier = Modifier.height(32.dp)
+                    ) {
                         Text("Refresh", fontSize = 12.sp)
                     }
                 }
@@ -151,30 +153,34 @@ fun MessagingScreen(
 
         // Messages list
         LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) { items(messages) { message -> MessageBubble(message = message) } }
+            state = listState,
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(messages) { message ->
+                MessageBubble(message = message)
+            }
+        }
 
         // Debug logs (collapsible)
         var showDebugLogs by remember { mutableStateOf(false) }
         Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                colors =
-                        CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
         ) {
             Column {
                 Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                            text = "Debug Logs",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                        text = "Debug Logs",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
                     )
                     TextButton(onClick = { showDebugLogs = !showDebugLogs }) {
                         Text(if (showDebugLogs) "Hide" else "Show")
@@ -183,15 +189,15 @@ fun MessagingScreen(
 
                 if (showDebugLogs) {
                     LazyColumn(
-                            modifier = Modifier.height(120.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        modifier = Modifier.height(120.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         items(debugLogs.takeLast(20)) { log ->
                             Text(
-                                    text = log,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                text = log,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
                         }
                     }
@@ -201,26 +207,33 @@ fun MessagingScreen(
 
         // Message input
         Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
         ) {
-            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
                 OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a message...") },
-                        singleLine = true
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Type a message...") },
+                    singleLine = true
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                        onClick = {
-                            if (text.isNotBlank()) {
-                                onSend(text)
-                                text = ""
-                            }
-                        },
-                        enabled = text.isNotBlank()
+                    onClick = {
+                        if (text.isNotBlank()) {
+                            onSend(text)
+                            text = ""
+                        }
+                    },
+                    enabled = text.isNotBlank()
                 ) { Text("Send") }
             }
         }
@@ -233,46 +246,38 @@ private fun MessageBubble(message: Message) {
     val isErrorMessage = message.content.startsWith("[Error]")
 
     Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement =
-                    when {
-                        message.isServiceMessage || isSystemMessage || isErrorMessage ->
-                                Arrangement.Center
-                        message.isSent -> Arrangement.End
-                        else -> Arrangement.Start
-                    }
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = when {
+            message.isServiceMessage || isSystemMessage || isErrorMessage -> Arrangement.Center
+            message.isSent -> Arrangement.End
+            else -> Arrangement.Start
+        }
     ) {
         Card(
-                modifier = Modifier.widthIn(max = 280.dp),
-                colors =
-                        CardDefaults.cardColors(
-                                containerColor =
-                                        when {
-                                            isErrorMessage ->
-                                                    MaterialTheme.colorScheme.errorContainer
-                                            isSystemMessage ->
-                                                    MaterialTheme.colorScheme.tertiaryContainer
-                                            message.isServiceMessage ->
-                                                    MaterialTheme.colorScheme.secondaryContainer
-                                            message.isSent -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.surfaceVariant
-                                        }
-                        ),
+            modifier = Modifier.widthIn(max = 280.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = when {
+                        isErrorMessage -> MaterialTheme.colorScheme.errorContainer
+                        isSystemMessage -> MaterialTheme.colorScheme.tertiaryContainer
+                        message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
+                        message.isSent -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ),
                 shape = RoundedCornerShape(16.dp)
         ) {
             Text(
-                    text = message.content,
-                    modifier = Modifier.padding(12.dp),
-                    color =
-                            when {
-                                isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
-                                isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
-                                message.isServiceMessage ->
-                                        MaterialTheme.colorScheme.onSecondaryContainer
-                                message.isSent -> MaterialTheme.colorScheme.onPrimary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    style = MaterialTheme.typography.bodyMedium
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                color = when {
+                    isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
+                    isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
+                    message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
+                    message.isSent -> MaterialTheme.colorScheme.onPrimary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.bodyMedium
             )
         }
     }

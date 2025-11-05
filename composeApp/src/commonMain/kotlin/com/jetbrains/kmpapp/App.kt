@@ -18,12 +18,12 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun App(
-        wifiAwareService: WifiAwareService,
-        permissionsGranted: Boolean = false,
-        wifiAwareSupported: Boolean = true
+    wifiAwareService: WifiAwareService,
+    permissionsGranted: Boolean = false,
+    wifiAwareSupported: Boolean = true
 ) {
     MaterialTheme(
-            colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
+        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
     ) {
         Surface {
             // Show unsupported screen if WiFi Aware is not available
@@ -91,12 +91,11 @@ fun App(
                 wifiAwareService.startDiscovery { msg ->
                     debugLogs.add("[App] Message received (refresh): $msg")
                     println("[App] Message received (refresh): $msg")
-                    val message =
-                            Message(
-                                    content = msg,
-                                    isSent = false,
-                                    isServiceMessage = msg.startsWith("Service discovered:")
-                            )
+                    val message = Message(
+                        content = msg,
+                        isSent = false,
+                        isServiceMessage = msg.startsWith("Service discovered:")
+                    )
                     messages.add(message)
                     lastReceivedMessage.value = msg
                 }
@@ -104,23 +103,26 @@ fun App(
                 debugLogs.add("[UI] Discovery restarted successfully.")
             }
             MessagingScreen(
-                    messages = messages,
-                    onSend = { msg ->
-                        debugLogs.add("[App] Sending message: $msg")
-                        println("[App] Sending message: $msg")
-                        wifiAwareService.sendMessage(msg)
-                        val message =
-                                Message(content = msg, isSent = true, isServiceMessage = false)
-                        messages.add(message)
-                        lastSentMessage.value = msg
-                    },
-                    debugLogs = debugLogs,
-                    discoveryStatus = discoveryStatus.value,
-                    lastReceivedMessage = lastReceivedMessage.value,
-                    lastSentMessage = lastSentMessage.value,
-                    onRefresh = { refreshDiscovery() },
-                    localDeviceId = localDeviceId.value,
-                    connectedPeerIds = connectedPeerIds.toList()
+                messages = messages,
+                onSend = { msg ->
+                    debugLogs.add("[App] Sending message: $msg")
+                    println("[App] Sending message: $msg")
+                    wifiAwareService.sendMessage(msg)
+                    val message = Message(
+                        content = msg,
+                        isSent = true,
+                        isServiceMessage = false
+                    )
+                    messages.add(message)
+                    lastSentMessage.value = msg
+                },
+                debugLogs = debugLogs,
+                discoveryStatus = discoveryStatus.value,
+                lastReceivedMessage = lastReceivedMessage.value,
+                lastSentMessage = lastSentMessage.value,
+                onRefresh = { refreshDiscovery() },
+                localDeviceId = localDeviceId.value,
+                connectedPeerIds = connectedPeerIds.toList()
             )
         }
     }
