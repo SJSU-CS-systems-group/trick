@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinxSerialization)
+    alias(libs.plugins.wire)
 }
 
 kotlin {
@@ -52,6 +53,7 @@ kotlin {
                 implementation(libs.coil.network.ktor)
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose.viewmodel)
+                implementation(libs.wire.runtime)
             }
         }
         val commonTest by getting {
@@ -125,4 +127,13 @@ android {
 
 dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+wire {
+    kotlin {
+        // Generate Kotlin code for all platforms
+    }
+    sourcePath {
+        srcDir("src/commonMain/proto")
+    }
 }

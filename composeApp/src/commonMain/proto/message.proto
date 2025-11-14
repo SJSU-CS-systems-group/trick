@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package com.jetbrains.kmpapp.messaging;
+
+option java_package = "com.jetbrains.kmpapp.messaging";
+
+// Message type enumeration
+enum MessageType {
+  TEXT = 0;
+  PHOTO = 1;
+}
+
+// Text message content
+message TextContent {
+  string text = 1;
+}
+
+// Photo message content with embedded bytes
+message PhotoContent {
+  bytes data = 1;
+  optional string filename = 2;
+  optional string mime_type = 3;
+}
+
+// Main chat message using oneof for polymorphic content
+message ChatMessage {
+  // Unique identifier for the message
+  string message_id = 1;
+
+  // Timestamp in milliseconds since epoch
+  int64 timestamp = 2;
+
+  // Sender device identifier
+  string sender_id = 3;
+
+  // Message content - can be either text or photo
+  oneof content {
+    TextContent text_content = 4;
+    PhotoContent photo_content = 5;
+  }
+}
