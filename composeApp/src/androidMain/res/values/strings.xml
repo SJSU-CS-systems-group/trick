@@ -1,7 +1,3 @@
 <resources>
-<<<<<<< HEAD
     <string name="app_name">KMP App</string>
-=======
-    <string name="app_name">Trick</string>
->>>>>>> upstream/main
 </resources>
