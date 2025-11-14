@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-rootProject.name = "KMP-App-Template"
-=======
 rootProject.name = "Trick"
->>>>>>> upstream/main
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
@@ -32,8 +28,4 @@ dependencyResolutionManagement {
     }
 }
 
-<<<<<<< HEAD
 include(":composeApp")
-=======
-include(":composeApp")
->>>>>>> upstream/main
