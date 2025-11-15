@@ -9,14 +9,17 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
+import com.jetbrains.kmpapp.messaging.ChatMessage
+import com.jetbrains.kmpapp.messaging.PhotoContent
+import com.jetbrains.kmpapp.messaging.TextContent
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
+import okio.ByteString.Companion.toByteString
 
 /**
  * WiFi Aware Manager with full peer-to-peer capabilities
@@ -450,9 +453,9 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             Log.d(TAG, "[Server] Client connected: ${clientSocket.remoteSocketAddress}")
 
-            // Setup IO streams
-            val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
-            val writer = BufferedWriter(OutputStreamWriter(clientSocket.getOutputStream()))
+            // Setup IO streams for binary protobuf data
+            val inputStream = DataInputStream(clientSocket.getInputStream())
+            val outputStream = DataOutputStream(clientSocket.getOutputStream())
 
             // Create connection object
             val connection =
@@ -462,8 +465,8 @@ class AndroidWifiAwareManager(private val context: Context) {
                             role = Role.SERVER,
                             socket = clientSocket,
                             serverSocket = serverSocket,
-                            reader = reader,
-                            writer = writer,
+                            inputStream = inputStream,
+                            outputStream = outputStream,
                             network = network,
                             networkCallback = networkCallback
                     )
@@ -639,9 +642,9 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             Log.d(TAG, "[Client] Connected to server: ${socket.remoteSocketAddress}")
 
-            // Setup IO streams
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream()))
+            // Setup IO streams for binary protobuf data
+            val inputStream = DataInputStream(socket.getInputStream())
+            val outputStream = DataOutputStream(socket.getOutputStream())
 
             // Create connection object
             val connection =
@@ -651,8 +654,8 @@ class AndroidWifiAwareManager(private val context: Context) {
                             role = Role.CLIENT,
                             socket = socket,
                             serverSocket = null,
-                            reader = reader,
-                            writer = writer,
+                            inputStream = inputStream,
+                            outputStream = outputStream,
                             network = network,
                             networkCallback = networkCallback
                     )
@@ -694,10 +697,10 @@ class AndroidWifiAwareManager(private val context: Context) {
                                 return@launch
                             }
 
-            val reader =
-                    connection.reader
+            val inputStream =
+                    connection.inputStream
                             ?: run {
-                                Log.e(TAG, "Cannot start listener: reader is null")
+                                Log.e(TAG, "Cannot start listener: inputStream is null")
                                 return@launch
                             }
 
@@ -705,29 +708,45 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             try {
                 while (isActive && connection.socket?.isConnected == true) {
-                    // Read message using framing protocol
-                    val message = reader.readLine()
+                    // Read length-prefixed protobuf message
+                    val messageLength = inputStream.readInt()
 
-                    if (message == null) {
-                        Log.w(TAG, "Connection closed by peer $peerId")
+                    if (messageLength <= 0 || messageLength > 10_000_000) {
+                        Log.e(TAG, "Invalid message length: $messageLength")
                         break
                     }
 
+                    val messageBytes = ByteArray(messageLength)
+                    inputStream.readFully(messageBytes)
+
                     connection.updateLastMessageTime()
 
-                    // Handle system messages
-                    if (message.startsWith("HEARTBEAT")) {
+                    // Deserialize protobuf message
+                    val chatMessage =
+                            try {
+                                ChatMessage.ADAPTER.decode(messageBytes)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to decode protobuf message: ${e.message}")
+                                continue
+                            }
+
+                    // Handle heartbeat (special case with empty content)
+                    if (chatMessage.text_content?.text == "HEARTBEAT") {
                         Log.d(TAG, "Heartbeat received from ${DeviceIdentity.getShortId(peerId)}")
                         continue
                     }
 
-                    Log.d(
-                            TAG,
-                            "Message received from ${DeviceIdentity.getShortId(peerId)}: $message"
-                    )
+                    Log.d(TAG, "Message received from ${DeviceIdentity.getShortId(peerId)}")
 
-                    // Notify on main thread
-                    withContext(Dispatchers.Main) { messageCallback?.invoke(message, peerId) }
+                    // Notify on main thread with the deserialized message
+                    withContext(Dispatchers.Main) {
+                        // Pass the serialized ChatMessage as a string for now
+                        // We'll update the callback signature later
+                        val messageText =
+                                chatMessage.text_content?.text
+                                        ?: chatMessage.photo_content?.filename ?: "[Image]"
+                        messageCallback?.invoke(messageText, peerId)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Message listener error for $peerId: ${e.message}")
@@ -764,12 +783,25 @@ class AndroidWifiAwareManager(private val context: Context) {
             }
 
             try {
-                val writer = connection.writer ?: throw Exception("Writer is null")
+                val outputStream =
+                        connection.outputStream ?: throw Exception("OutputStream is null")
 
-                // Send with framing (newline-delimited for simplicity)
-                writer.write(message)
-                writer.write("\n")
-                writer.flush()
+                // Create protobuf message with text content
+                val chatMessage =
+                        ChatMessage(
+                                message_id = UUID.randomUUID().toString(),
+                                timestamp = System.currentTimeMillis(),
+                                sender_id = localDeviceId,
+                                text_content = TextContent(text = message)
+                        )
+
+                // Serialize to bytes
+                val messageBytes = chatMessage.encode()
+
+                // Send with length-prefixed framing
+                outputStream.writeInt(messageBytes.size)
+                outputStream.write(messageBytes)
+                outputStream.flush()
 
                 connection.updateLastMessageTime()
 
@@ -792,6 +824,98 @@ class AndroidWifiAwareManager(private val context: Context) {
         peers.forEach { connection -> sendMessageToPeer(message, connection.peerId) }
     }
 
+    /** Send picture to specific peer or broadcast to all */
+    fun sendPicture(
+            imageData: ByteArray,
+            filename: String?,
+            mimeType: String?,
+            targetPeerId: String? = null
+    ) {
+        if (targetPeerId != null) {
+            sendPictureToPeer(imageData, filename, mimeType, targetPeerId)
+        } else {
+            broadcastPicture(imageData, filename, mimeType)
+        }
+    }
+
+    /** Send picture to specific peer */
+    fun sendPictureToPeer(
+            imageData: ByteArray,
+            filename: String?,
+            mimeType: String?,
+            peerId: String
+    ) {
+        scope.launch(Dispatchers.IO) {
+            val connection = connectionPool.getConnection(peerId)
+
+            if (connection == null) {
+                Log.e(
+                        TAG,
+                        "Cannot send picture: no connection to ${DeviceIdentity.getShortId(peerId)}"
+                )
+                withContext(Dispatchers.Main) {
+                    notifyMessage(
+                            "[Error] Not connected to ${DeviceIdentity.getShortId(peerId)}",
+                            null
+                    )
+                }
+                return@launch
+            }
+
+            try {
+                val outputStream =
+                        connection.outputStream ?: throw Exception("OutputStream is null")
+
+                // Create protobuf message with photo content
+                val chatMessage =
+                        ChatMessage(
+                                message_id = UUID.randomUUID().toString(),
+                                timestamp = System.currentTimeMillis(),
+                                sender_id = localDeviceId,
+                                photo_content =
+                                        PhotoContent(
+                                                data_ = imageData.toByteString(),
+                                                filename = filename,
+                                                mime_type = mimeType
+                                        )
+                        )
+
+                // Serialize to bytes
+                val messageBytes = chatMessage.encode()
+
+                Log.d(
+                        TAG,
+                        "Sending picture to ${DeviceIdentity.getShortId(peerId)}: ${messageBytes.size} bytes"
+                )
+
+                // Send with length-prefixed framing
+                outputStream.writeInt(messageBytes.size)
+                outputStream.write(messageBytes)
+                outputStream.flush()
+
+                connection.updateLastMessageTime()
+
+                Log.d(TAG, "Picture sent to ${DeviceIdentity.getShortId(peerId)}: $filename")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send picture to $peerId: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    notifyMessage("[Error] Failed to send picture: ${e.message}", peerId)
+                }
+                handleConnectionLost(peerId)
+            }
+        }
+    }
+
+    /** Broadcast picture to all connected peers */
+    fun broadcastPicture(imageData: ByteArray, filename: String?, mimeType: String?) {
+        val peers = connectionPool.getAllConnections()
+        Log.d(TAG, "Broadcasting picture to ${peers.size} peers")
+
+        peers.forEach { connection ->
+            sendPictureToPeer(imageData, filename, mimeType, connection.peerId)
+        }
+    }
+
     /** Handle connection loss */
     private fun handleConnectionLost(peerId: String) {
         val connection = connectionPool.removeConnection(peerId) ?: return
@@ -801,10 +925,10 @@ class AndroidWifiAwareManager(private val context: Context) {
         // Cleanup resources
         scope.launch(Dispatchers.IO) {
             try {
+                connection.inputStream?.close()
+                connection.outputStream?.close()
                 connection.socket?.close()
                 connection.serverSocket?.close()
-                connection.reader?.close()
-                connection.writer?.close()
                 connection.networkCallback?.let {
                     connectivityManager.unregisterNetworkCallback(it)
                 }

@@ -29,6 +29,14 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
         manager.broadcastMessage(message)
     }
 
+    override fun sendPicture(imageData: ByteArray, filename: String?, mimeType: String?) {
+        Log.d("WifiAwareServiceImpl", "Broadcasting picture: $filename (${imageData.size} bytes)")
+        Log.d("WifiAwareServiceImpl", "Connection status: ${manager.getConnectionStatus()}")
+
+        // Broadcast picture to all connected peers
+        manager.broadcastPicture(imageData, filename, mimeType)
+    }
+
     override fun isPeerConnected(): Boolean {
         return manager.getConnectedPeers().isNotEmpty()
     }

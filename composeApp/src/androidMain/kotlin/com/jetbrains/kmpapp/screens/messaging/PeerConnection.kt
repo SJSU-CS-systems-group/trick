@@ -3,8 +3,8 @@ package com.jetbrains.kmpapp.screens.messaging
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.wifi.aware.PeerHandle
-import java.io.BufferedReader
-import java.io.BufferedWriter
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.net.Socket
 import java.net.ServerSocket
 
@@ -26,8 +26,8 @@ data class PeerConnection(
     val role: Role,
     val socket: Socket?,
     val serverSocket: ServerSocket?,
-    val reader: BufferedReader?,
-    val writer: BufferedWriter?,
+    val inputStream: DataInputStream?,
+    val outputStream: DataOutputStream?,
     val network: Network?,
     val networkCallback: ConnectivityManager.NetworkCallback?,
     val connectionTime: Long = System.currentTimeMillis(),

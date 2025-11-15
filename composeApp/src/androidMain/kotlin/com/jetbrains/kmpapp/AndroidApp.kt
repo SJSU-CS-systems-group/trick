@@ -1,5 +1,7 @@
 package com.jetbrains.kmpapp
 
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,10 +17,14 @@ import com.jetbrains.kmpapp.screens.messaging.Message
 import com.jetbrains.kmpapp.screens.messaging.MessageType
 import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
 import com.jetbrains.kmpapp.screens.messaging.WifiAwareService
+import com.jetbrains.kmpapp.screens.messaging.rememberImagePickerLauncher
 import kotlinx.coroutines.delay
 
+/**
+ * Android-specific wrapper for App that provides image picker functionality
+ */
 @Composable
-fun App(
+fun AndroidApp(
     wifiAwareService: WifiAwareService,
     permissionsGranted: Boolean = false,
     wifiAwareSupported: Boolean = true
@@ -56,6 +62,27 @@ fun App(
                 }
             }
 
+            // Image picker launcher
+            val imagePickerLauncher = rememberImagePickerLauncher { imageResult ->
+                debugLogs.add("[App] Image picked: ${imageResult.filename} (${imageResult.data.size} bytes)")
+                println("[App] Image picked: ${imageResult.filename}")
+                
+                // Send the image
+                wifiAwareService.sendPicture(imageResult.data, imageResult.filename, imageResult.mimeType)
+                
+                // Add to messages
+                val message = Message(
+                    content = "[Image]",
+                    isSent = true,
+                    isServiceMessage = false,
+                    type = MessageType.IMAGE,
+                    imageData = imageResult.data,
+                    filename = imageResult.filename
+                )
+                messages.add(message)
+                lastSentMessage.value = imageResult.filename
+            }
+
             // Start discovery only when permissions are granted
             LaunchedEffect(permissionsGranted) {
                 if (permissionsGranted) {
@@ -80,6 +107,7 @@ fun App(
                     debugLogs.add("[UI] Waiting for user to grant permissions...")
                 }
             }
+            
             fun refreshDiscovery() {
                 debugLogs.add("[UI] Manual refresh triggered - stopping discovery...")
                 discoveryStatus.value = "Stopping..."
@@ -103,6 +131,7 @@ fun App(
                 discoveryStatus.value = "Running (refreshed)"
                 debugLogs.add("[UI] Discovery restarted successfully.")
             }
+            
             MessagingScreen(
                 messages = messages,
                 onSend = { msg ->
@@ -140,8 +169,13 @@ fun App(
                 onRefresh = { refreshDiscovery() },
                 localDeviceId = localDeviceId.value,
                 connectedPeerIds = connectedPeerIds.toList(),
-                onPickImage = null // Will be provided by Android-specific wrapper
+                onPickImage = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
             )
         }
     }
 }
+
