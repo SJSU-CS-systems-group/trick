@@ -63,7 +63,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             )
 
     // Callbacks
-    private var messageCallback: ((String, String?) -> Unit)? = null // (message, peerId)
+    private var messageCallback: ((ChatMessage, String?) -> Unit)? = null // (chatMessage, peerId)
     private var connectionStatusCallback: ((String, ConnectionState) -> Unit)? = null
 
     // State
@@ -75,7 +75,7 @@ class AndroidWifiAwareManager(private val context: Context) {
 
     /** Start discovery and connection establishment */
     fun startDiscovery(
-            onMessageReceived: (String, String?) -> Unit,
+            onMessageReceived: (ChatMessage, String?) -> Unit,
             onConnectionStatusChanged: ((String, ConnectionState) -> Unit)? = null
     ) {
         if (isRunning.getAndSet(true)) {
@@ -738,15 +738,8 @@ class AndroidWifiAwareManager(private val context: Context) {
 
                     Log.d(TAG, "Message received from ${DeviceIdentity.getShortId(peerId)}")
 
-                    // Notify on main thread with the deserialized message
-                    withContext(Dispatchers.Main) {
-                        // Pass the serialized ChatMessage as a string for now
-                        // We'll update the callback signature later
-                        val messageText =
-                                chatMessage.text_content?.text
-                                        ?: chatMessage.photo_content?.filename ?: "[Image]"
-                        messageCallback?.invoke(messageText, peerId)
-                    }
+                    // Notify on main thread with the full ChatMessage
+                    withContext(Dispatchers.Main) { messageCallback?.invoke(chatMessage, peerId) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Message listener error for $peerId: ${e.message}")
@@ -1036,7 +1029,17 @@ class AndroidWifiAwareManager(private val context: Context) {
 
     /** Helper to notify message callback */
     private fun notifyMessage(message: String, peerId: String? = null) {
-        scope.launch(Dispatchers.Main) { messageCallback?.invoke(message, peerId) }
+        scope.launch(Dispatchers.Main) {
+            // Create a ChatMessage for system messages
+            val chatMessage =
+                    ChatMessage(
+                            message_id = UUID.randomUUID().toString(),
+                            timestamp = System.currentTimeMillis(),
+                            sender_id = "system",
+                            text_content = TextContent(text = message)
+                    )
+            messageCallback?.invoke(chatMessage, peerId)
+        }
     }
 
     /** Helper to notify connection status callback */

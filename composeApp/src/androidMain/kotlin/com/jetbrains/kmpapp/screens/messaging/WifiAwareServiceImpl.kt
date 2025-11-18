@@ -7,13 +7,16 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
     // Connection-based WiFi Aware manager
     private val manager = AndroidWifiAwareManager(context)
 
-    override fun startDiscovery(onMessageReceived: (String) -> Unit) {
+    override fun startDiscovery(onMessageReceived: (com.jetbrains.kmpapp.messaging.ChatMessage) -> Unit) {
         Log.d("WifiAwareServiceImpl", "Starting discovery with connection-based networking")
 
         manager.startDiscovery(
-            onMessageReceived = { message, peerId ->
-                Log.d("WifiAwareServiceImpl", "Message received from ${peerId?.take(8) ?: "unknown"}: $message")
-                onMessageReceived(message)
+            onMessageReceived = { chatMessage, peerId ->
+                val messagePreview = chatMessage.text_content?.text 
+                    ?: chatMessage.photo_content?.filename 
+                    ?: "[Image]"
+                Log.d("WifiAwareServiceImpl", "Message received from ${peerId?.take(8) ?: "unknown"}: $messagePreview")
+                onMessageReceived(chatMessage)
             },
             onConnectionStatusChanged = { peerId, state ->
                 Log.d("WifiAwareServiceImpl", "Connection status: ${peerId.take(8)} -> $state")
