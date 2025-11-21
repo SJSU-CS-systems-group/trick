@@ -1,5 +1,6 @@
 package com.jetbrains.kmpapp.screens.messaging
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.imePadding
@@ -9,16 +10,62 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class Message(val content: String, val isSent: Boolean, val isServiceMessage: Boolean = false)
+enum class MessageType {
+    TEXT,
+    IMAGE
+}
+
+data class Message(
+    val content: String, 
+    val isSent: Boolean, 
+    val isServiceMessage: Boolean = false,
+    val type: MessageType = MessageType.TEXT,
+    val imageData: ByteArray? = null,
+    val filename: String? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as Message
+
+        if (content != other.content) return false
+        if (isSent != other.isSent) return false
+        if (isServiceMessage != other.isServiceMessage) return false
+        if (type != other.type) return false
+        if (imageData != null) {
+            if (other.imageData == null) return false
+            if (!imageData.contentEquals(other.imageData)) return false
+        } else if (other.imageData != null) return false
+        if (filename != other.filename) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = content.hashCode()
+        result = 31 * result + isSent.hashCode()
+        result = 31 * result + isServiceMessage.hashCode()
+        result = 31 * result + type.hashCode()
+        result = 31 * result + (imageData?.contentHashCode() ?: 0)
+        result = 31 * result + (filename?.hashCode() ?: 0)
+        return result
+    }
+}
 
 // Helper function to get short ID (first 8 characters)
 fun getShortDeviceId(deviceId: String): String {
@@ -29,17 +76,23 @@ fun getShortDeviceId(deviceId: String): String {
     }
 }
 
+// Helper function to convert ByteArray to ImageBitmap
+@Composable
+expect fun rememberImageBitmap(imageData: ByteArray): ImageBitmap?
+
 @Composable
 fun MessagingScreen(
     messages: List<Message>,
     onSend: (String) -> Unit,
+    onSendPicture: (ByteArray, String?, String?) -> Unit,
     debugLogs: List<String>,
     discoveryStatus: String,
     lastReceivedMessage: String,
     lastSentMessage: String,
     onRefresh: () -> Unit,
     localDeviceId: String,
-    connectedPeerIds: List<String>
+    connectedPeerIds: List<String>,
+    onPickImage: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf("") }
     var showFullDeviceId by remember { mutableStateOf(false) }
@@ -218,6 +271,19 @@ fun MessagingScreen(
                 modifier = Modifier.padding(8.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
+                // Attachment button (only if onPickImage is provided)
+                if (onPickImage != null) {
+                    IconButton(
+                        onClick = { onPickImage() },
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Attach image"
+                        )
+                    }
+                }
+                
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
@@ -267,18 +333,55 @@ private fun MessageBubble(message: Message) {
                 ),
                 shape = RoundedCornerShape(16.dp)
         ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(12.dp),
-                color = when {
-                    isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
-                    isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
-                    message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
-                    message.isSent -> MaterialTheme.colorScheme.onPrimary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Display image if it's an image message
+                if (message.type == MessageType.IMAGE && message.imageData != null) {
+                    val imageBitmap = rememberImageBitmap(message.imageData)
+                    if (imageBitmap != null) {
+                        Image(
+                            bitmap = imageBitmap,
+                            contentDescription = message.filename ?: "Image",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                        if (message.filename != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = message.filename,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when {
+                                    message.isSent -> MaterialTheme.colorScheme.onPrimary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }.copy(alpha = 0.7f)
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "[Image: ${message.filename ?: "unknown"}]",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when {
+                                message.isSent -> MaterialTheme.colorScheme.onPrimary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                } else {
+                    // Display text message
+                    Text(
+                        text = message.content,
+                        color = when {
+                            isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
+                            isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
+                            message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
+                            message.isSent -> MaterialTheme.colorScheme.onPrimary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     }
 }

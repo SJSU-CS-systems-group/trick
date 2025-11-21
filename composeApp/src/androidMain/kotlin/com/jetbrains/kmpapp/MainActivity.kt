@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge()
             }
             val wifiAwareService = WifiAwareServiceImpl(this@MainActivity)
-            App(
+            AndroidApp(
                 wifiAwareService = wifiAwareService,
                 permissionsGranted = permissionsGranted.value,
                 wifiAwareSupported = wifiAwareSupported.value
