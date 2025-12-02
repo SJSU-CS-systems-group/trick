@@ -481,7 +481,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
-                    "[System] Connected as SERVER to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    "[System] Connected to ${DeviceIdentity.getShortId(remoteDeviceId)}",
                     remoteDeviceId
             )
 
@@ -670,7 +670,7 @@ class AndroidWifiAwareManager(private val context: Context) {
             )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
-                    "[System] Connected as CLIENT to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    "[System] Connected to ${DeviceIdentity.getShortId(remoteDeviceId)}",
                     remoteDeviceId
             )
 
