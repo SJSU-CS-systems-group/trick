@@ -1,0 +1,5 @@
+headers = LibSignalBridge.h
+headerFilter = LibSignalBridge.h
+package = net.discdd.trick.libsignal.bridge
+compilerOpts = -I${projectDir}/../iosApp/SignalBridge/Sources/SignalBridge/include
+linkerOpts = -framework SignalBridge -framework LibSignalClient
