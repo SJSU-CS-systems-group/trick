@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.screens.messaging
+package net.discdd.trick.screens.messaging
 
 import android.Manifest
 import android.content.Context
@@ -9,9 +9,9 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.jetbrains.kmpapp.messaging.ChatMessage
-import com.jetbrains.kmpapp.messaging.PhotoContent
-import com.jetbrains.kmpapp.messaging.TextContent
+import net.discdd.trick.messaging.ChatMessage
+import net.discdd.trick.messaging.PhotoContent
+import net.discdd.trick.messaging.TextContent
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress

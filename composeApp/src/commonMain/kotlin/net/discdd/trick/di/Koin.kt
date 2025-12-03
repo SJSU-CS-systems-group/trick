@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.di
+package net.discdd.trick.di
 
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
@@ -6,7 +6,7 @@ import org.koin.dsl.module
 fun initKoin() {
     startKoin {
         modules(
-            // No modules needed for WiFi Aware messaging app
+            // No modules needed for Wi-Fi Aware messaging app
         )
     }
 }

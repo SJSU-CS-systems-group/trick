@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.screens
+package net.discdd.trick.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
