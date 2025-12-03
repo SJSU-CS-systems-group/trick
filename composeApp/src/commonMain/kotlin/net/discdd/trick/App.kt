@@ -10,7 +10,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import net.discdd.trick.screens.UnsupportedDeviceScreen
+import net.discdd.trick.screens.KeyExchangeScreen
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageType
 import net.discdd.trick.screens.messaging.MessagingScreen

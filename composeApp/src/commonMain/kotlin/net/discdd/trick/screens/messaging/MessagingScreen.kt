@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,12 +32,13 @@ enum class MessageType {
 }
 
 data class Message(
-    val content: String, 
-    val isSent: Boolean, 
+    val content: String,
+    val isSent: Boolean,
     val isServiceMessage: Boolean = false,
     val type: MessageType = MessageType.TEXT,
     val imageData: ByteArray? = null,
-    val filename: String? = null
+    val filename: String? = null,
+    val isEncrypted: Boolean = false
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -52,6 +55,7 @@ data class Message(
             if (!imageData.contentEquals(other.imageData)) return false
         } else if (other.imageData != null) return false
         if (filename != other.filename) return false
+        if (isEncrypted != other.isEncrypted) return false
 
         return true
     }
@@ -63,6 +67,7 @@ data class Message(
         result = 31 * result + type.hashCode()
         result = 31 * result + (imageData?.contentHashCode() ?: 0)
         result = 31 * result + (filename?.hashCode() ?: 0)
+        result = 31 * result + isEncrypted.hashCode()
         return result
     }
 }
@@ -92,7 +97,8 @@ fun MessagingScreen(
     onRefresh: () -> Unit,
     localDeviceId: String,
     connectedPeerIds: List<String>,
-    onPickImage: (() -> Unit)? = null
+    onPickImage: (() -> Unit)? = null,
+    onNavigateToKeyExchange: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf("") }
     var showFullDeviceId by remember { mutableStateOf(false) }
@@ -181,6 +187,28 @@ fun MessagingScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Action buttons row
+                if (onNavigateToKeyExchange != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onNavigateToKeyExchange() },
+                            modifier = Modifier.height(36.dp).weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Key Exchange", fontSize = 12.sp)
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
@@ -380,6 +408,33 @@ private fun MessageBubble(message: Message) {
                         },
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+
+                // Show encryption indicator for encrypted messages
+                if (message.isEncrypted && !message.isServiceMessage && !isSystemMessage && !isErrorMessage) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Encrypted",
+                            modifier = Modifier.size(12.dp),
+                            tint = when {
+                                message.isSent -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            }
+                        )
+                        Text(
+                            text = "Encrypted",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when {
+                                message.isSent -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            }
+                        )
+                    }
                 }
             }
         }

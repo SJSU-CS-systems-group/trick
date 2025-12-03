@@ -1,5 +1,6 @@
 package net.discdd.trick
 
+import android.content.Context
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,6 +13,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import net.discdd.trick.screens.UnsupportedDeviceScreen
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageType
@@ -47,6 +51,7 @@ fun AndroidApp(
             val lastSentMessage = remember { mutableStateOf("") }
             val localDeviceId = remember { mutableStateOf("") }
             val connectedPeerIds = remember { mutableStateListOf<String>() }
+            var showKeyExchange by remember { mutableStateOf(false) }
 
             // Initialize device ID
             LaunchedEffect(Unit) { localDeviceId.value = wifiAwareService.getDeviceId() }
@@ -96,17 +101,21 @@ fun AndroidApp(
                     discoveryStatus.value = "Starting..."
                     debugLogs.add("[UI] Starting discovery...")
                     wifiAwareService.startDiscovery { chatMessage ->
+                        // Check if message was encrypted (encryption_version field present)
+                        val wasEncrypted = chatMessage.encryption_version != null
+
                         // Handle text content
                         val textContent = chatMessage.text_content
                         if (textContent != null) {
                             val msg = textContent.text
-                            debugLogs.add("[App] Message received: $msg")
+                            debugLogs.add("[App] Message received${if (wasEncrypted) " (encrypted)" else ""}: $msg")
                             println("[App] Message received: $msg")
                             val message =
                                     Message(
                                             content = msg,
                                             isSent = false,
-                                            isServiceMessage = msg.startsWith("Service discovered:")
+                                            isServiceMessage = msg.startsWith("Service discovered:"),
+                                            isEncrypted = wasEncrypted
                                     )
                             messages.add(message)
                             lastReceivedMessage.value = msg
@@ -117,7 +126,7 @@ fun AndroidApp(
                             val imageData = photoContent!!.data_.toByteArray()
                             val filename = photoContent!!.filename ?: "image"
                             debugLogs.add(
-                                    "[App] Image received: $filename (${imageData.size} bytes)"
+                                    "[App] Image received${if (wasEncrypted) " (encrypted)" else ""}: $filename (${imageData.size} bytes)"
                             )
                             println("[App] Image received: $filename")
                             val message =
@@ -127,7 +136,8 @@ fun AndroidApp(
                                             isServiceMessage = false,
                                             type = MessageType.IMAGE,
                                             imageData = imageData,
-                                            filename = filename
+                                            filename = filename,
+                                            isEncrypted = wasEncrypted
                                     )
                             messages.add(message)
                             lastReceivedMessage.value = filename
@@ -192,7 +202,16 @@ fun AndroidApp(
                 debugLogs.add("[UI] Discovery restarted successfully.")
             }
 
-            MessagingScreen(
+            val context = LocalContext.current
+
+            if (showKeyExchange) {
+                AndroidKeyExchangeScreen(
+                    context = context,
+                    deviceId = localDeviceId.value,
+                    onNavigateBack = { showKeyExchange = false }
+                )
+            } else {
+                MessagingScreen(
                     messages = messages,
                     onSend = { msg ->
                         debugLogs.add("[App] Sending message: $msg")
@@ -237,8 +256,12 @@ fun AndroidApp(
                                         ActivityResultContracts.PickVisualMedia.ImageOnly
                                 )
                         )
+                    },
+                    onNavigateToKeyExchange = {
+                        showKeyExchange = true
                     }
-            )
+                )
+            }
         }
     }
 }

@@ -86,6 +86,19 @@ kotlin {
                 implementation("org.signal:libsignal-android:0.79.0")
                 implementation("org.signal:libsignal-client:0.79.0")
 
+                // QR Code generation and scanning
+                implementation("com.google.zxing:core:3.5.3")
+                implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+                implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
+                // CameraX for QR scanning
+                implementation("androidx.camera:camera-camera2:1.3.1")
+                implementation("androidx.camera:camera-lifecycle:1.3.1")
+                implementation("androidx.camera:camera-view:1.3.1")
+
+                // Permissions handling
+                implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
                 // JetBrains Compose preview/tooling ONLY on Android
                 implementation(compose.preview)
                 implementation(compose.components.uiToolingPreview)

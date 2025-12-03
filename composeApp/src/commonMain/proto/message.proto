@@ -38,4 +38,9 @@ message ChatMessage {
     TextContent text_content = 4;
     PhotoContent photo_content = 5;
   }
+
+  // Encryption fields (optional for backward compatibility)
+  optional bytes encrypted_content = 6;      // Encrypted serialized TextContent or PhotoContent
+  optional string encryption_version = 7;    // Encryption version identifier (e.g., "hpke-v1")
+  optional bytes sender_public_key = 8;      // Sender's public key for verification
 }
