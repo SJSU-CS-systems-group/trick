@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.screens.messaging
+package net.discdd.trick.screens.messaging
 
 import android.net.wifi.aware.PeerHandle
 import android.util.Log

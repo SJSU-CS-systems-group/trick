@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.screens.messaging
+package net.discdd.trick.screens.messaging
 
 import android.content.Context
 import android.util.Log
@@ -7,7 +7,7 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
     // Connection-based WiFi Aware manager
     private val manager = AndroidWifiAwareManager(context)
 
-    override fun startDiscovery(onMessageReceived: (com.jetbrains.kmpapp.messaging.ChatMessage) -> Unit) {
+    override fun startDiscovery(onMessageReceived: (net.discdd.trick.messaging.ChatMessage) -> Unit) {
         Log.d("WifiAwareServiceImpl", "Starting discovery with connection-based networking")
 
         manager.startDiscovery(

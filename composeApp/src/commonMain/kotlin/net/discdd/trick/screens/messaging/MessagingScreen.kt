@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp.screens.messaging
+package net.discdd.trick.screens.messaging
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable

@@ -1,6 +1,6 @@
-package com.jetbrains.kmpapp.screens.messaging
+package net.discdd.trick.screens.messaging
 
-import com.jetbrains.kmpapp.messaging.ChatMessage
+import net.discdd.trick.messaging.ChatMessage
 
 interface WifiAwareService {
     fun startDiscovery(onMessageReceived: (ChatMessage) -> Unit)

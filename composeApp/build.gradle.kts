@@ -96,11 +96,11 @@ kotlin {
 }
 
 android {
-    namespace = "com.jetbrains.kmpapp"
+    namespace = "net.discdd.trick"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.jetbrains.kmpapp"
+        applicationId = "net.discdd.trick"
         minSdk = 29
         targetSdk = 35
         versionCode = 1

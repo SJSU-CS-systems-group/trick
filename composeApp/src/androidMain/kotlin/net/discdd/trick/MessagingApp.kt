@@ -1,7 +1,7 @@
-package com.jetbrains.kmpapp
+package net.discdd.trick
 
 import android.app.Application
-import com.jetbrains.kmpapp.di.initKoin
+import net.discdd.trick.di.initKoin
 
 class MessagingApp : Application() {
     override fun onCreate() {

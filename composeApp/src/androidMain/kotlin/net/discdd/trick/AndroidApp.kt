@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp
+package net.discdd.trick
 
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,12 +12,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.jetbrains.kmpapp.screens.UnsupportedDeviceScreen
-import com.jetbrains.kmpapp.screens.messaging.Message
-import com.jetbrains.kmpapp.screens.messaging.MessageType
-import com.jetbrains.kmpapp.screens.messaging.MessagingScreen
-import com.jetbrains.kmpapp.screens.messaging.WifiAwareService
-import com.jetbrains.kmpapp.screens.messaging.rememberImagePickerLauncher
+import net.discdd.trick.screens.UnsupportedDeviceScreen
+import net.discdd.trick.screens.messaging.Message
+import net.discdd.trick.screens.messaging.MessageType
+import net.discdd.trick.screens.messaging.MessagingScreen
+import net.discdd.trick.screens.messaging.WifiAwareService
+import net.discdd.trick.screens.messaging.rememberImagePickerLauncher
 import kotlinx.coroutines.delay
 
 /** 
