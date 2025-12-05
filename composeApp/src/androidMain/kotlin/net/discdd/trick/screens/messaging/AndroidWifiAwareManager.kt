@@ -12,6 +12,8 @@ import androidx.core.content.ContextCompat
 import net.discdd.trick.messaging.ChatMessage
 import net.discdd.trick.messaging.PhotoContent
 import net.discdd.trick.messaging.TextContent
+import net.discdd.trick.security.KeyManager
+import net.discdd.trick.libsignal.createLibSignalManager
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -41,6 +43,10 @@ class AndroidWifiAwareManager(private val context: Context) {
 
     // Device identity
     private val localDeviceId: String by lazy { DeviceIdentity.generateDeviceId(context) }
+
+    // Encryption components
+    private val keyManager = KeyManager(context)
+    private val libSignalManager = createLibSignalManager()
 
     // Connection management
     private val connectionPool = ConnectionPool()
@@ -730,16 +736,58 @@ class AndroidWifiAwareManager(private val context: Context) {
                                 continue
                             }
 
+                    // Check if encrypted and decrypt if necessary
+                    val decryptedMessage = if (chatMessage.encrypted_content != null) {
+                        try {
+                            // DECRYPT: Get our private key and decrypt
+                            val myKeyPair = keyManager.getIdentityKeyPair()
+                            if (myKeyPair == null) {
+                                Log.e(TAG, "Cannot decrypt: no identity key pair")
+                                chatMessage.copy(text_content = TextContent(text = "[Decryption failed: No key pair]"))
+                            } else {
+                                val decryptedBytes = libSignalManager.decrypt(
+                                    myKeyPair.privateKey,
+                                    chatMessage.encrypted_content.toByteArray()
+                                )
+
+                                // Try to determine content type and deserialize
+                                val decryptedContent = try {
+                                    // Try as TextContent first
+                                    val textContent = TextContent.ADAPTER.decode(decryptedBytes)
+                                    chatMessage.copy(text_content = textContent, encrypted_content = null)
+                                } catch (e: Exception) {
+                                    // Try as PhotoContent
+                                    try {
+                                        val photoContent = PhotoContent.ADAPTER.decode(decryptedBytes)
+                                        chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                                    } catch (e2: Exception) {
+                                        Log.e(TAG, "Failed to deserialize decrypted content: ${e2.message}")
+                                        chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Invalid content]"))
+                                    }
+                                }
+
+                                Log.d(TAG, "Message decrypted from ${DeviceIdentity.getShortId(peerId)}")
+                                decryptedContent
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Decryption failed: ${e.message}", e)
+                            chatMessage.copy(text_content = TextContent(text = "[Decryption failed: ${e.message}]"))
+                        }
+                    } else {
+                        // Plaintext message
+                        chatMessage
+                    }
+
                     // Handle heartbeat (special case with empty content)
-                    if (chatMessage.text_content?.text == "HEARTBEAT") {
+                    if (decryptedMessage.text_content?.text == "HEARTBEAT") {
                         Log.d(TAG, "Heartbeat received from ${DeviceIdentity.getShortId(peerId)}")
                         continue
                     }
 
                     Log.d(TAG, "Message received from ${DeviceIdentity.getShortId(peerId)}")
 
-                    // Notify on main thread with the full ChatMessage
-                    withContext(Dispatchers.Main) { messageCallback?.invoke(chatMessage, peerId) }
+                    // Notify on main thread with the decrypted ChatMessage
+                    withContext(Dispatchers.Main) { messageCallback?.invoke(decryptedMessage, peerId) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Message listener error for $peerId: ${e.message}")
@@ -779,14 +827,36 @@ class AndroidWifiAwareManager(private val context: Context) {
                 val outputStream =
                         connection.outputStream ?: throw Exception("OutputStream is null")
 
-                // Create protobuf message with text content
-                val chatMessage =
-                        ChatMessage(
-                                message_id = UUID.randomUUID().toString(),
-                                timestamp = System.currentTimeMillis(),
-                                sender_id = localDeviceId,
-                                text_content = TextContent(text = message)
-                        )
+                // Create text content
+                val textContent = TextContent(text = message)
+
+                // Check if peer is trusted (key exchange completed)
+                val peerPublicKey = keyManager.getPeerPublicKey(peerId)
+
+                val chatMessage = if (peerPublicKey != null) {
+                    // ENCRYPT: Serialize content, then encrypt with peer's public key
+                    val contentBytes = textContent.encode()
+                    val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
+                    val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
+
+                    ChatMessage(
+                        message_id = UUID.randomUUID().toString(),
+                        timestamp = System.currentTimeMillis(),
+                        sender_id = localDeviceId,
+                        encrypted_content = encryptedBytes.toByteString(),
+                        encryption_version = "hpke-v1",
+                        sender_public_key = myPublicKey?.data?.toByteString()
+                    )
+                } else {
+                    // PLAINTEXT FALLBACK: Peer not trusted, send unencrypted
+                    Log.w(TAG, "Peer $peerId not trusted, sending plaintext")
+                    ChatMessage(
+                        message_id = UUID.randomUUID().toString(),
+                        timestamp = System.currentTimeMillis(),
+                        sender_id = localDeviceId,
+                        text_content = textContent
+                    )
+                }
 
                 // Serialize to bytes
                 val messageBytes = chatMessage.encode()
@@ -798,7 +868,7 @@ class AndroidWifiAwareManager(private val context: Context) {
 
                 connection.updateLastMessageTime()
 
-                Log.d(TAG, "Message sent to ${DeviceIdentity.getShortId(peerId)}: $message")
+                Log.d(TAG, "Message sent to ${DeviceIdentity.getShortId(peerId)} (encrypted=${peerPublicKey != null}): $message")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message to $peerId: ${e.message}", e)
                 withContext(Dispatchers.Main) {
@@ -859,26 +929,47 @@ class AndroidWifiAwareManager(private val context: Context) {
                 val outputStream =
                         connection.outputStream ?: throw Exception("OutputStream is null")
 
-                // Create protobuf message with photo content
-                val chatMessage =
-                        ChatMessage(
-                                message_id = UUID.randomUUID().toString(),
-                                timestamp = System.currentTimeMillis(),
-                                sender_id = localDeviceId,
-                                photo_content =
-                                        PhotoContent(
-                                                data_ = imageData.toByteString(),
-                                                filename = filename,
-                                                mime_type = mimeType
-                                        )
-                        )
+                // Create photo content
+                val photoContent = PhotoContent(
+                    data_ = imageData.toByteString(),
+                    filename = filename,
+                    mime_type = mimeType
+                )
+
+                // Check if peer is trusted (key exchange completed)
+                val peerPublicKey = keyManager.getPeerPublicKey(peerId)
+
+                val chatMessage = if (peerPublicKey != null) {
+                    // ENCRYPT: Serialize content, then encrypt with peer's public key
+                    val contentBytes = photoContent.encode()
+                    val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
+                    val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
+
+                    ChatMessage(
+                        message_id = UUID.randomUUID().toString(),
+                        timestamp = System.currentTimeMillis(),
+                        sender_id = localDeviceId,
+                        encrypted_content = encryptedBytes.toByteString(),
+                        encryption_version = "hpke-v1",
+                        sender_public_key = myPublicKey?.data?.toByteString()
+                    )
+                } else {
+                    // PLAINTEXT FALLBACK: Peer not trusted, send unencrypted
+                    Log.w(TAG, "Peer $peerId not trusted, sending plaintext image")
+                    ChatMessage(
+                        message_id = UUID.randomUUID().toString(),
+                        timestamp = System.currentTimeMillis(),
+                        sender_id = localDeviceId,
+                        photo_content = photoContent
+                    )
+                }
 
                 // Serialize to bytes
                 val messageBytes = chatMessage.encode()
 
                 Log.d(
                         TAG,
-                        "Sending picture to ${DeviceIdentity.getShortId(peerId)}: ${messageBytes.size} bytes"
+                        "Sending picture to ${DeviceIdentity.getShortId(peerId)} (encrypted=${peerPublicKey != null}): ${messageBytes.size} bytes"
                 )
 
                 // Send with length-prefixed framing
