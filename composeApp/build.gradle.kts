@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinxSerialization)
+    alias(libs.plugins.sqldelight)
     alias(libs.plugins.wire)
 }
 
@@ -68,6 +69,7 @@ kotlin {
                 implementation(libs.coil.network.ktor)
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose.viewmodel)
+                implementation(libs.sqldelight.runtime)
                 implementation(libs.wire.runtime)
             }
         }
@@ -81,6 +83,7 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.compose.ui.tooling.preview)
                 implementation(libs.ktor.client.okhttp)
+                implementation(libs.sqldelight.android.driver)
 
                 // REAL Signal Foundation libsignal: include both per docs
                 implementation("org.signal:libsignal-android:0.79.0")
@@ -187,6 +190,15 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     // Required by libsignal-android when using Java 17 features
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
+}
+
+sqldelight {
+    databases {
+        create("TrickDatabase") {
+            packageName.set("net.discdd.trick")
+            verifyMigrations.set(true)
+        }
+    }
 }
 
 wire {
