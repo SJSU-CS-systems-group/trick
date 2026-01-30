@@ -1,7 +1,6 @@
 package net.discdd.trick.di
 
 import net.discdd.trick.TrickDatabase
-import net.discdd.trick.data.DatabaseProvider
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
