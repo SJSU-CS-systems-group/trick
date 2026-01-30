@@ -1,0 +1,93 @@
+-- Contact table
+CREATE TABLE Contact (
+    id TEXT NOT NULL PRIMARY KEY,
+    short_id TEXT NOT NULL,
+    display_name TEXT,
+    public_key_hex TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_message_at INTEGER,
+    last_message_preview TEXT
+);
+
+CREATE INDEX Contact_short_id ON Contact(short_id);
+CREATE INDEX Contact_last_message_at ON Contact(last_message_at);
+
+-- Message table
+CREATE TABLE Message (
+    id TEXT NOT NULL PRIMARY KEY,
+    contact_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL,
+    is_sent INTEGER NOT NULL,
+    is_encrypted INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    image_path TEXT,
+    status TEXT NOT NULL,
+    FOREIGN KEY(contact_id) REFERENCES Contact(id) ON DELETE CASCADE
+);
+
+CREATE INDEX Message_contact_id ON Message(contact_id);
+CREATE INDEX Message_timestamp ON Message(timestamp);
+CREATE INDEX Message_contact_timestamp ON Message(contact_id, timestamp);
+
+-- Contact queries
+selectAll:
+SELECT * FROM Contact
+ORDER BY last_message_at DESC, created_at DESC;
+
+selectById:
+SELECT * FROM Contact
+WHERE id = ?;
+
+selectByShortId:
+SELECT * FROM Contact
+WHERE short_id = ?;
+
+insertContact:
+INSERT INTO Contact(id, short_id, display_name, public_key_hex, created_at, last_message_at, last_message_preview)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+updateContact:
+UPDATE Contact
+SET display_name = ?,
+    public_key_hex = ?,
+    last_message_at = ?,
+    last_message_preview = ?
+WHERE id = ?;
+
+deleteContact:
+DELETE FROM Contact
+WHERE id = ?;
+
+-- Message queries
+selectMessagesByContact:
+SELECT * FROM Message
+WHERE contact_id = ?
+ORDER BY timestamp ASC;
+
+selectMessageById:
+SELECT * FROM Message
+WHERE id = ?;
+
+selectRecentMessages:
+SELECT * FROM Message
+ORDER BY timestamp DESC
+LIMIT ?;
+
+insertMessage:
+INSERT INTO Message(id, contact_id, content, type, is_sent, is_encrypted, timestamp, image_path, status)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateMessageStatus:
+UPDATE Message
+SET status = ?
+WHERE id = ?;
+
+deleteMessage:
+DELETE FROM Message
+WHERE id = ?;
+
+deleteMessagesByContact:
+DELETE FROM Message
+WHERE contact_id = ?;
+

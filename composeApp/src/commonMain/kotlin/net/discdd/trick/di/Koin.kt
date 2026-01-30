@@ -1,12 +1,19 @@
 package net.discdd.trick.di
 
+import net.discdd.trick.TrickDatabase
+import net.discdd.trick.data.DatabaseProvider
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
-fun initKoin() {
+fun initKoin(database: TrickDatabase? = null) {
     startKoin {
         modules(
-            // No modules needed for Wi-Fi Aware messaging app
+            module {
+                // Provide database if available
+                if (database != null) {
+                    single<TrickDatabase> { database }
+                }
+            }
         )
     }
 }

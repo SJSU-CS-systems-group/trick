@@ -132,7 +132,11 @@ internal expect fun currentTimeMillis(): Long
  * Convert ByteArray to hex string.
  */
 fun ByteArray.toHexString(): String {
-    return joinToString("") { "%02x".format(it) }
+    return joinToString("") { byte ->
+        val unsignedByte = (byte.toInt() and 0xFF)
+        val hex = unsignedByte.toString(16)
+        if (hex.length == 1) "0$hex" else hex
+    }
 }
 
 /**
