@@ -58,19 +58,19 @@ class ContactRepositoryImpl(
 ) : ContactRepository {
 
     override fun getAllContacts(): List<Contact> {
-        return database.contactQueries.selectAll().executeAsList().map { it.toDomain() }
+        return database.trickDatabaseQueries.selectAll().executeAsList().map { it.toDomain() }
     }
 
     override fun getContactById(id: String): Contact? {
-        return database.contactQueries.selectById(id).executeAsOneOrNull()?.toDomain()
+        return database.trickDatabaseQueries.selectById(id).executeAsOneOrNull()?.toDomain()
     }
 
     override fun getContactByShortId(shortId: String): Contact? {
-        return database.contactQueries.selectByShortId(shortId).executeAsOneOrNull()?.toDomain()
+        return database.trickDatabaseQueries.selectByShortId(shortId).executeAsOneOrNull()?.toDomain()
     }
 
     override fun insertContact(contact: Contact): Long {
-        database.contactQueries.insertContact(
+        database.trickDatabaseQueries.insertContact(
             id = contact.id,
             short_id = contact.shortId,
             display_name = contact.displayName,
@@ -84,7 +84,7 @@ class ContactRepositoryImpl(
     }
 
     override fun updateContact(contact: Contact): Int {
-        database.contactQueries.updateContact(
+        database.trickDatabaseQueries.updateContact(
             display_name = contact.displayName,
             public_key_hex = contact.publicKeyHex,
             last_message_at = contact.lastMessageAt,
@@ -96,7 +96,7 @@ class ContactRepositoryImpl(
     }
 
     override fun deleteContact(id: String): Int {
-        database.contactQueries.deleteContact(id)
+        database.trickDatabaseQueries.deleteContact(id)
         return 1 // Assuming success if no exception thrown
     }
 
@@ -148,7 +148,7 @@ class ContactRepositoryImpl(
     /**
      * Map SQLDelight Contact to domain Contact.
      */
-    private fun TrickDatabase.Contact.toDomain(): Contact {
+    private fun net.discdd.trick.Contact.toDomain(): Contact {
         return Contact(
             id = id,
             shortId = short_id,
