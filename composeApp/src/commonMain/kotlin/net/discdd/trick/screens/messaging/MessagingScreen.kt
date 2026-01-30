@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -32,13 +31,13 @@ enum class MessageType {
 }
 
 data class Message(
-    val content: String,
-    val isSent: Boolean,
-    val isServiceMessage: Boolean = false,
-    val type: MessageType = MessageType.TEXT,
-    val imageData: ByteArray? = null,
-    val filename: String? = null,
-    val isEncrypted: Boolean = false
+        val content: String,
+        val isSent: Boolean,
+        val isServiceMessage: Boolean = false,
+        val type: MessageType = MessageType.TEXT,
+        val imageData: ByteArray? = null,
+        val filename: String? = null,
+        val isEncrypted: Boolean = false
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -82,23 +81,23 @@ fun getShortDeviceId(deviceId: String): String {
 }
 
 // Helper function to convert ByteArray to ImageBitmap
-@Composable
-expect fun rememberImageBitmap(imageData: ByteArray): ImageBitmap?
+@Composable expect fun rememberImageBitmap(imageData: ByteArray): ImageBitmap?
 
 @Composable
 fun MessagingScreen(
-    messages: List<Message>,
-    onSend: (String) -> Unit,
-    onSendPicture: (ByteArray, String?, String?) -> Unit,
-    debugLogs: List<String>,
-    discoveryStatus: String,
-    lastReceivedMessage: String,
-    lastSentMessage: String,
-    onRefresh: () -> Unit,
-    localDeviceId: String,
-    connectedPeerIds: List<String>,
-    onPickImage: (() -> Unit)? = null,
-    onNavigateToKeyExchange: (() -> Unit)? = null
+        messages: List<Message>,
+        onSend: (String) -> Unit,
+        onSendPicture: (ByteArray, String?, String?) -> Unit,
+        debugLogs: List<String>,
+        discoveryStatus: String,
+        lastReceivedMessage: String,
+        lastSentMessage: String,
+        onRefresh: () -> Unit,
+        localDeviceId: String,
+        connectedPeerIds: List<String>,
+        onPickImage: (() -> Unit)? = null,
+        onNavigateToKeyExchange: (() -> Unit)? = null,
+        onNavigateToContacts: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf("") }
     var showFullDeviceId by remember { mutableStateOf(false) }
@@ -112,48 +111,61 @@ fun MessagingScreen(
     }
 
     Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
+            modifier =
+                    Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
     ) {
         // Header with status and device IDs
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                colors =
+                        CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "WiFi Aware Chat",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                            text = "WiFi Aware Chat",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                    )
+                    if (onNavigateToContacts != null) {
+                        Button(
+                                onClick = { onNavigateToContacts() },
+                                modifier = Modifier.height(36.dp)
+                        ) { Text("Contacts", fontSize = 12.sp) }
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Device ID section
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Your ID: ",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                            text = "Your ID: ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text =
-                            if (showFullDeviceId) localDeviceId
-                            else getShortDeviceId(localDeviceId),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        modifier =
-                            Modifier.weight(1f).clickable {
-                                showFullDeviceId = !showFullDeviceId
-                            }
+                            text =
+                                    if (showFullDeviceId) localDeviceId
+                                    else getShortDeviceId(localDeviceId),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Monospace,
+                            modifier =
+                                    Modifier.weight(1f).clickable {
+                                        showFullDeviceId = !showFullDeviceId
+                                    }
                     )
                     TextButton(
-                        onClick = { showFullDeviceId = !showFullDeviceId },
-                        modifier = Modifier.height(24.dp)
+                            onClick = { showFullDeviceId = !showFullDeviceId },
+                            modifier = Modifier.height(24.dp)
                     ) { Text(text = if (showFullDeviceId) "Less" else "More", fontSize = 10.sp) }
                 }
 
@@ -163,29 +175,29 @@ fun MessagingScreen(
                 if (connectedPeerIds.isNotEmpty()) {
                     Column {
                         Text(
-                            text = "Connected to:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                                text = "Connected to:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         connectedPeerIds.forEach { peerId ->
                             Text(
-                                text = "  • ${getShortDeviceId(peerId)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color =
-                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                                        alpha = 0.8f
-                                    )
+                                    text = "  • ${getShortDeviceId(peerId)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color =
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                                                    alpha = 0.8f
+                                            )
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 } else {
                     Text(
-                        text = "No peers connected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
+                            text = "No peers connected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -193,17 +205,17 @@ fun MessagingScreen(
                 // Action buttons row
                 if (onNavigateToKeyExchange != null) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { onNavigateToKeyExchange() },
-                            modifier = Modifier.height(36.dp).weight(1f)
+                                onClick = { onNavigateToKeyExchange() },
+                                modifier = Modifier.height(36.dp).weight(1f)
                         ) {
                             Icon(
-                                Icons.Default.Settings,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                    Icons.Default.Settings,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Key Exchange", fontSize = 12.sp)
@@ -214,18 +226,15 @@ fun MessagingScreen(
 
                 // Status row
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Status: $discoveryStatus",
-                        style = MaterialTheme.typography.bodyMedium
+                            text = "Status: $discoveryStatus",
+                            style = MaterialTheme.typography.bodyMedium
                     )
-                    Button(
-                        onClick = { onRefresh() },
-                        modifier = Modifier.height(32.dp)
-                    ) {
+                    Button(onClick = { onRefresh() }, modifier = Modifier.height(32.dp)) {
                         Text("Refresh", fontSize = 12.sp)
                     }
                 }
@@ -234,34 +243,30 @@ fun MessagingScreen(
 
         // Messages list
         LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages) { message ->
-                MessageBubble(message = message)
-            }
-        }
+                state = listState,
+                modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) { items(messages) { message -> MessageBubble(message = message) } }
 
         // Debug logs (collapsible)
         var showDebugLogs by remember { mutableStateOf(false) }
         Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                colors =
+                        CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
         ) {
             Column {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Debug Logs",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                            text = "Debug Logs",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
                     )
                     TextButton(onClick = { showDebugLogs = !showDebugLogs }) {
                         Text(if (showDebugLogs) "Hide" else "Show")
@@ -270,15 +275,15 @@ fun MessagingScreen(
 
                 if (showDebugLogs) {
                     LazyColumn(
-                        modifier = Modifier.height(120.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                            modifier = Modifier.height(120.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         items(debugLogs.takeLast(20)) { log ->
                             Text(
-                                text = log,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp)
+                                    text = log,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
                             )
                         }
                     }
@@ -288,46 +293,34 @@ fun MessagingScreen(
 
         // Message input
         Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
+            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
                 // Attachment button (only if onPickImage is provided)
                 if (onPickImage != null) {
                     IconButton(
-                        onClick = { onPickImage() },
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Attach image"
-                        )
-                    }
+                            onClick = { onPickImage() },
+                            modifier = Modifier.padding(end = 4.dp)
+                    ) { Icon(imageVector = Icons.Default.Add, contentDescription = "Attach image") }
                 }
-                
+
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Type a message...") },
-                    singleLine = true
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Type a message...") },
+                        singleLine = true
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = {
-                        if (text.isNotBlank()) {
-                            onSend(text)
-                            text = ""
-                        }
-                    },
-                    enabled = text.isNotBlank()
+                        onClick = {
+                            if (text.isNotBlank()) {
+                                onSend(text)
+                                text = ""
+                            }
+                        },
+                        enabled = text.isNotBlank()
                 ) { Text("Send") }
             }
         }
@@ -340,25 +333,31 @@ private fun MessageBubble(message: Message) {
     val isErrorMessage = message.content.startsWith("[Error]")
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = when {
-            message.isServiceMessage || isSystemMessage || isErrorMessage -> Arrangement.Center
-            message.isSent -> Arrangement.End
-            else -> Arrangement.Start
-        }
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                    when {
+                        message.isServiceMessage || isSystemMessage || isErrorMessage ->
+                                Arrangement.Center
+                        message.isSent -> Arrangement.End
+                        else -> Arrangement.Start
+                    }
     ) {
         Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = when {
-                        isErrorMessage -> MaterialTheme.colorScheme.errorContainer
-                        isSystemMessage -> MaterialTheme.colorScheme.tertiaryContainer
-                        message.isServiceMessage -> MaterialTheme.colorScheme.secondaryContainer
-                        message.isSent -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    }
-                ),
+                modifier = Modifier.widthIn(max = 280.dp),
+                colors =
+                        CardDefaults.cardColors(
+                                containerColor =
+                                        when {
+                                            isErrorMessage ->
+                                                    MaterialTheme.colorScheme.errorContainer
+                                            isSystemMessage ->
+                                                    MaterialTheme.colorScheme.tertiaryContainer
+                                            message.isServiceMessage ->
+                                                    MaterialTheme.colorScheme.secondaryContainer
+                                            message.isSent -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.surfaceVariant
+                                        }
+                        ),
                 shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -367,72 +366,94 @@ private fun MessageBubble(message: Message) {
                     val imageBitmap = rememberImageBitmap(message.imageData)
                     if (imageBitmap != null) {
                         Image(
-                            bitmap = imageBitmap,
-                            contentDescription = message.filename ?: "Image",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 200.dp),
-                            contentScale = ContentScale.Fit
+                                bitmap = imageBitmap,
+                                contentDescription = message.filename ?: "Image",
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                                contentScale = ContentScale.Fit
                         )
                         if (message.filename != null) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = message.filename,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = when {
-                                    message.isSent -> MaterialTheme.colorScheme.onPrimary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }.copy(alpha = 0.7f)
+                                    text = message.filename,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color =
+                                            when {
+                                                message.isSent ->
+                                                        MaterialTheme.colorScheme.onPrimary
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }.copy(alpha = 0.7f)
                             )
                         }
                     } else {
                         Text(
-                            text = "[Image: ${message.filename ?: "unknown"}]",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = when {
-                                message.isSent -> MaterialTheme.colorScheme.onPrimary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                                text = "[Image: ${message.filename ?: "unknown"}]",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color =
+                                        when {
+                                            message.isSent -> MaterialTheme.colorScheme.onPrimary
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
                         )
                     }
                 } else {
                     // Display text message
                     Text(
-                        text = message.content,
-                        color = when {
-                            isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
-                            isSystemMessage -> MaterialTheme.colorScheme.onTertiaryContainer
-                            message.isServiceMessage -> MaterialTheme.colorScheme.onSecondaryContainer
-                            message.isSent -> MaterialTheme.colorScheme.onPrimary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        style = MaterialTheme.typography.bodyMedium
+                            text = message.content,
+                            color =
+                                    when {
+                                        isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
+                                        isSystemMessage ->
+                                                MaterialTheme.colorScheme.onTertiaryContainer
+                                        message.isServiceMessage ->
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                        message.isSent -> MaterialTheme.colorScheme.onPrimary
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            style = MaterialTheme.typography.bodyMedium
                     )
                 }
 
                 // Show encryption indicator for encrypted messages
-                if (message.isEncrypted && !message.isServiceMessage && !isSystemMessage && !isErrorMessage) {
+                if (message.isEncrypted &&
+                                !message.isServiceMessage &&
+                                !isSystemMessage &&
+                                !isErrorMessage
+                ) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Encrypted",
-                            modifier = Modifier.size(12.dp),
-                            tint = when {
-                                message.isSent -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            }
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Encrypted",
+                                modifier = Modifier.size(12.dp),
+                                tint =
+                                        when {
+                                            message.isSent ->
+                                                    MaterialTheme.colorScheme.onPrimary.copy(
+                                                            alpha = 0.7f
+                                                    )
+                                            else ->
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    )
+                                        }
                         )
                         Text(
-                            text = "Encrypted",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = when {
-                                message.isSent -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            }
+                                text = "Encrypted",
+                                style = MaterialTheme.typography.labelSmall,
+                                color =
+                                        when {
+                                            message.isSent ->
+                                                    MaterialTheme.colorScheme.onPrimary.copy(
+                                                            alpha = 0.7f
+                                                    )
+                                            else ->
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    )
+                                        }
                         )
                     }
                 }

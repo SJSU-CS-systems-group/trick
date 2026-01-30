@@ -35,6 +35,11 @@ import okio.ByteString.Companion.toByteString
 class AndroidWifiAwareManager(private val context: Context) {
     private val TAG = "WifiAware"
 
+    companion object {
+        private const val CONTENT_TYPE_TEXT = 0
+        private const val CONTENT_TYPE_PHOTO = 1
+    }
+
     // WiFi Aware components
     private var wifiAwareManager: WifiAwareManager? = null
     private var session: WifiAwareSession? = null
@@ -750,19 +755,36 @@ class AndroidWifiAwareManager(private val context: Context) {
                                     chatMessage.encrypted_content.toByteArray()
                                 )
 
-                                // Try to determine content type and deserialize
-                                val decryptedContent = try {
-                                    // Try as TextContent first
-                                    val textContent = TextContent.ADAPTER.decode(decryptedBytes)
-                                    chatMessage.copy(text_content = textContent, encrypted_content = null)
-                                } catch (e: Exception) {
-                                    // Try as PhotoContent
-                                    try {
-                                        val photoContent = PhotoContent.ADAPTER.decode(decryptedBytes)
-                                        chatMessage.copy(photo_content = photoContent, encrypted_content = null)
-                                    } catch (e2: Exception) {
-                                        Log.e(TAG, "Failed to deserialize decrypted content: ${e2.message}")
+                                // Decode by type discriminator, or legacy (no discriminator)
+                                val decryptedContent = when {
+                                    decryptedBytes.isEmpty() -> {
+                                        Log.e(TAG, "Decrypted content is empty")
                                         chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Invalid content]"))
+                                    }
+                                    decryptedBytes[0] == CONTENT_TYPE_TEXT.toByte() -> {
+                                        val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
+                                        val textContent = TextContent.ADAPTER.decode(payload.toByteString())
+                                        chatMessage.copy(text_content = textContent, encrypted_content = null)
+                                    }
+                                    decryptedBytes[0] == CONTENT_TYPE_PHOTO.toByte() -> {
+                                        val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
+                                        val photoContent = PhotoContent.ADAPTER.decode(payload.toByteString())
+                                        chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                                    }
+                                    else -> {
+                                        // Legacy format: no discriminator; try PhotoContent first, then TextContent
+                                        try {
+                                            val photoContent = PhotoContent.ADAPTER.decode(decryptedBytes.toByteString())
+                                            chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                                        } catch (e: Exception) {
+                                            try {
+                                                val textContent = TextContent.ADAPTER.decode(decryptedBytes.toByteString())
+                                                chatMessage.copy(text_content = textContent, encrypted_content = null)
+                                            } catch (e2: Exception) {
+                                                Log.e(TAG, "Failed to deserialize decrypted content: ${e2.message}")
+                                                chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Invalid content]"))
+                                            }
+                                        }
                                     }
                                 }
 
@@ -834,8 +856,8 @@ class AndroidWifiAwareManager(private val context: Context) {
                 val peerPublicKey = keyManager.getPeerPublicKey(peerId)
 
                 val chatMessage = if (peerPublicKey != null) {
-                    // ENCRYPT: Serialize content, then encrypt with peer's public key
-                    val contentBytes = textContent.encode()
+                    // ENCRYPT: Prepend type discriminator, then encrypt with peer's public key
+                    val contentBytes = byteArrayOf(CONTENT_TYPE_TEXT.toByte()) + textContent.encode()
                     val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
                     val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
 
@@ -940,8 +962,8 @@ class AndroidWifiAwareManager(private val context: Context) {
                 val peerPublicKey = keyManager.getPeerPublicKey(peerId)
 
                 val chatMessage = if (peerPublicKey != null) {
-                    // ENCRYPT: Serialize content, then encrypt with peer's public key
-                    val contentBytes = photoContent.encode()
+                    // ENCRYPT: Prepend type discriminator, then encrypt with peer's public key
+                    val contentBytes = byteArrayOf(CONTENT_TYPE_PHOTO.toByte()) + photoContent.encode()
                     val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
                     val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
 
