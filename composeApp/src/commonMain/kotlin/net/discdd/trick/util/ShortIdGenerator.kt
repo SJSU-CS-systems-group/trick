@@ -40,4 +40,3 @@ object ShortIdGenerator {
  * Platform-specific SHA-256 hash implementation.
  */
 internal expect fun sha256(data: ByteArray): ByteArray
-
