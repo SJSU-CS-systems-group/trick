@@ -25,20 +25,6 @@ interface ContactRepository {
 
     /**
      * Insert a new contact.
-<<<<<<< HEAD
-     */
-    fun insertContact(contact: Contact)
-
-    /**
-     * Update an existing contact.
-     */
-    fun updateContact(contact: Contact)
-
-    /**
-     * Delete a contact by ID.
-     */
-    fun deleteContact(id: String)
-=======
      * @return The row ID of the inserted contact
      */
     fun insertContact(contact: Contact): Long
@@ -54,7 +40,6 @@ interface ContactRepository {
      * @return The number of rows deleted (should be 1 if successful)
      */
     fun deleteContact(id: String): Int
->>>>>>> 4276060 (Add Contact repository with migration from KeyManager trusted peers)
 
     /**
      * Migrate trusted peers from KeyManager to Contact table.
@@ -73,21 +58,6 @@ class ContactRepositoryImpl(
 ) : ContactRepository {
 
     override fun getAllContacts(): List<Contact> {
-<<<<<<< HEAD
-        return database.trickDatabaseQueries.selectAll().executeAsList().map { it.toDomain() }
-    }
-
-    override fun getContactById(id: String): Contact? {
-        return database.trickDatabaseQueries.selectById(id).executeAsOneOrNull()?.toDomain()
-    }
-
-    override fun getContactByShortId(shortId: String): Contact? {
-        return database.trickDatabaseQueries.selectByShortId(shortId).executeAsOneOrNull()?.toDomain()
-    }
-
-    override fun insertContact(contact: Contact) {
-        database.trickDatabaseQueries.insertContact(
-=======
         return database.contactQueries.selectAll().executeAsList().map { it.toDomain() }
     }
 
@@ -101,7 +71,6 @@ class ContactRepositoryImpl(
 
     override fun insertContact(contact: Contact): Long {
         database.contactQueries.insertContact(
->>>>>>> 4276060 (Add Contact repository with migration from KeyManager trusted peers)
             id = contact.id,
             short_id = contact.shortId,
             display_name = contact.displayName,
@@ -110,31 +79,18 @@ class ContactRepositoryImpl(
             last_message_at = contact.lastMessageAt,
             last_message_preview = contact.lastMessagePreview
         )
-<<<<<<< HEAD
-    }
-
-    override fun updateContact(contact: Contact) {
-        database.trickDatabaseQueries.updateContact(
-=======
         // SQLDelight insertContact doesn't return row ID directly, but we can query it
         return contact.createdAt // Return timestamp as identifier
     }
 
     override fun updateContact(contact: Contact): Int {
         database.contactQueries.updateContact(
->>>>>>> 4276060 (Add Contact repository with migration from KeyManager trusted peers)
             display_name = contact.displayName,
             public_key_hex = contact.publicKeyHex,
             last_message_at = contact.lastMessageAt,
             last_message_preview = contact.lastMessagePreview,
             id = contact.id
         )
-<<<<<<< HEAD
-    }
-
-    override fun deleteContact(id: String) {
-        database.trickDatabaseQueries.deleteContact(id)
-=======
         // SQLDelight updateContact returns number of affected rows
         return 1 // Assuming success if no exception thrown
     }
@@ -142,7 +98,6 @@ class ContactRepositoryImpl(
     override fun deleteContact(id: String): Int {
         database.contactQueries.deleteContact(id)
         return 1 // Assuming success if no exception thrown
->>>>>>> 4276060 (Add Contact repository with migration from KeyManager trusted peers)
     }
 
     override fun migrateFromKeyManager(keyManager: KeyManager): Int {
@@ -193,11 +148,7 @@ class ContactRepositoryImpl(
     /**
      * Map SQLDelight Contact to domain Contact.
      */
-<<<<<<< HEAD
-    private fun net.discdd.trick.Contact.toDomain(): Contact {
-=======
     private fun TrickDatabase.Contact.toDomain(): Contact {
->>>>>>> 4276060 (Add Contact repository with migration from KeyManager trusted peers)
         return Contact(
             id = id,
             shortId = short_id,
@@ -214,4 +165,3 @@ class ContactRepositoryImpl(
  * Get current time in milliseconds (platform-specific).
  */
 internal expect fun currentTimeMillis(): Long
-
