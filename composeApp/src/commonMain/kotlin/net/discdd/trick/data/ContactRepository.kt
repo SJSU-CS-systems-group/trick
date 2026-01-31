@@ -1,5 +1,10 @@
 package net.discdd.trick.data
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import net.discdd.trick.TrickDatabase
 import net.discdd.trick.security.KeyManager
 import net.discdd.trick.security.toHexString
@@ -12,6 +17,12 @@ interface ContactRepository {
      * Get all contacts, ordered by last message time (most recent first).
      */
     fun getAllContacts(): List<Contact>
+
+    /**
+     * Get all contacts as a Flow for reactive updates.
+     * Ordered by last message time (most recent first).
+     */
+    fun getAllContactsFlow(): Flow<List<Contact>>
 
     /**
      * Get a contact by its ID (primary key).
@@ -59,6 +70,13 @@ class ContactRepositoryImpl(
 
     override fun getAllContacts(): List<Contact> {
         return database.trickDatabaseQueries.selectAll().executeAsList().map { it.toDomain() }
+    }
+
+    override fun getAllContactsFlow(): Flow<List<Contact>> {
+        return database.trickDatabaseQueries.selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
     }
 
     override fun getContactById(id: String): Contact? {
