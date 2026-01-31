@@ -21,10 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
-import net.discdd.trick.screens.ContactsLandingPage
+import net.discdd.trick.screens.contacts.ContactsListScreen
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageType
 import net.discdd.trick.screens.messaging.MessagingScreen
@@ -175,12 +177,25 @@ fun TrickNavHost(
         startDestination = Screen.ContactsList.route
     ) {
         composable(Screen.ContactsList.route) {
-            ContactsLandingPage(
-                onNavigateToMessaging = { navController.navigate(Screen.Chat.route) }
+            ContactsListScreen(
+                onContactClick = { contact ->
+                    navController.navigate(Screen.Chat.createRoute(contact.id))
+                },
+                onAddContactClick = {
+                    // TODO: Navigate to add contact screen when implemented
+                    // For now, navigate to key exchange as a placeholder
+                    navController.navigate(Screen.KeyExchange.route)
+                }
             )
         }
 
-        composable(Screen.Chat.route) {
+        composable(
+            route = Screen.Chat.route,
+            arguments = listOf(
+                navArgument("contactId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
             val onPickImageForScreen: (() -> Unit)? = if (onPickImage != null) {
                 {
                     onPickImage { data, filename, mimeType ->
