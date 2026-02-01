@@ -20,3 +20,4 @@ expect object DatabaseProvider {
     fun getDatabase(): TrickDatabase
 }
 
+

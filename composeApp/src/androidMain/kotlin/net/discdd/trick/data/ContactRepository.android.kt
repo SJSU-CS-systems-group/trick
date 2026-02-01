@@ -5,3 +5,4 @@ package net.discdd.trick.data
  */
 internal actual fun currentTimeMillis(): Long = System.currentTimeMillis()
 
+

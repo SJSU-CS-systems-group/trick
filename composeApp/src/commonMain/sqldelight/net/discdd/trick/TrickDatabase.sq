@@ -91,3 +91,4 @@ deleteMessagesByContact:
 DELETE FROM Message
 WHERE contact_id = ?;
 
+

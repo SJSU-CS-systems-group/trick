@@ -185,6 +185,10 @@ fun TrickNavHost(
                     // TODO: Navigate to add contact screen when implemented
                     // For now, navigate to key exchange as a placeholder
                     navController.navigate(Screen.KeyExchange.route)
+                },
+                onTestMessagingClick = {
+                    // Temporary bypass: go directly to messaging with a test contact ID
+                    navController.navigate(Screen.Chat.createRoute("test-contact"))
                 }
             )
         }

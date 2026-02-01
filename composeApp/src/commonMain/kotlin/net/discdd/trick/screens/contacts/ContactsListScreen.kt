@@ -12,10 +12,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ContactsListScreen(
     onContactClick: (Contact) -> Unit,
     onAddContactClick: () -> Unit,
+    onTestMessagingClick: (() -> Unit)? = null,  // Temporary bypass for testing
     viewModel: ContactsListViewModel = koinViewModel()
 ) {
     val contacts by viewModel.contacts.collectAsState()
@@ -52,6 +55,18 @@ fun ContactsListScreen(
                         text = "Contacts",
                         style = MaterialTheme.typography.headlineMedium
                     )
+                },
+                actions = {
+                    // Temporary test button to bypass contacts and go directly to messaging
+                    if (onTestMessagingClick != null) {
+                        IconButton(onClick = onTestMessagingClick) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Test Messaging",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -156,4 +171,5 @@ private fun EmptyContactsState(
         )
     }
 }
+
 
