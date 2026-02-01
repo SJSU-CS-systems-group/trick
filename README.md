@@ -1,16 +1,22 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# Trick
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+A Kotlin Multiplatform messaging application for Android and iOS that enables peer-to-peer communication using WiFi Aware. Messages are encrypted using the Signal Protocol (libsignal) for end-to-end security.
 
-* [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+## Features
 
+- Peer-to-peer messaging over WiFi Aware
+- End-to-end encryption using Signal Protocol
+- Text and image messaging
+- QR code-based key exchange
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+## Project Structure
+
+- `composeApp/src/commonMain` - Shared code across platforms
+- `composeApp/src/androidMain` - Android-specific implementation
+- `composeApp/src/iosMain` - iOS-specific implementation
+- `iosApp` - iOS app entry point
+
+## Requirements
+
+- Android: API 29+ (Android 10+) with WiFi Aware support
+- iOS: iOS 13+ with WiFi Aware support

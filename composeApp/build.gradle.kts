@@ -116,6 +116,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 implementation(libs.ktor.client.darwin)
+                implementation(libs.sqldelight.native.driver)
             }
         }
         iosX64Main.dependsOn(iosMain)
