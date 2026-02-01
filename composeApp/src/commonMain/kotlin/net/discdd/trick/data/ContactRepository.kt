@@ -25,21 +25,18 @@ interface ContactRepository {
 
     /**
      * Insert a new contact.
-     * @return The row ID of the inserted contact
      */
-    fun insertContact(contact: Contact): Long
+    fun insertContact(contact: Contact)
 
     /**
      * Update an existing contact.
-     * @return The number of rows updated (should be 1 if successful)
      */
-    fun updateContact(contact: Contact): Int
+    fun updateContact(contact: Contact)
 
     /**
      * Delete a contact by ID.
-     * @return The number of rows deleted (should be 1 if successful)
      */
-    fun deleteContact(id: String): Int
+    fun deleteContact(id: String)
 
     /**
      * Migrate trusted peers from KeyManager to Contact table.
@@ -69,7 +66,7 @@ class ContactRepositoryImpl(
         return database.trickDatabaseQueries.selectByShortId(shortId).executeAsOneOrNull()?.toDomain()
     }
 
-    override fun insertContact(contact: Contact): Long {
+    override fun insertContact(contact: Contact) {
         database.trickDatabaseQueries.insertContact(
             id = contact.id,
             short_id = contact.shortId,
@@ -79,11 +76,9 @@ class ContactRepositoryImpl(
             last_message_at = contact.lastMessageAt,
             last_message_preview = contact.lastMessagePreview
         )
-        // SQLDelight insertContact doesn't return row ID directly, but we can query it
-        return contact.createdAt // Return timestamp as identifier
     }
 
-    override fun updateContact(contact: Contact): Int {
+    override fun updateContact(contact: Contact) {
         database.trickDatabaseQueries.updateContact(
             display_name = contact.displayName,
             public_key_hex = contact.publicKeyHex,
@@ -91,13 +86,10 @@ class ContactRepositoryImpl(
             last_message_preview = contact.lastMessagePreview,
             id = contact.id
         )
-        // SQLDelight updateContact returns number of affected rows
-        return 1 // Assuming success if no exception thrown
     }
 
-    override fun deleteContact(id: String): Int {
+    override fun deleteContact(id: String) {
         database.trickDatabaseQueries.deleteContact(id)
-        return 1 // Assuming success if no exception thrown
     }
 
     override fun migrateFromKeyManager(keyManager: KeyManager): Int {
