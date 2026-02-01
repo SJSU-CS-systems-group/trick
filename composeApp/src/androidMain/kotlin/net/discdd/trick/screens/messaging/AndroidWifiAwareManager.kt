@@ -21,6 +21,7 @@ import java.net.ServerSocket
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
+import kotlin.coroutines.cancellation.CancellationException
 import okio.ByteString.Companion.toByteString
 
 /**
@@ -110,12 +111,14 @@ class AndroidWifiAwareManager(private val context: Context) {
         if (!hasRequiredPermissions()) {
             Log.e(TAG, "Missing required permissions")
             notifyMessage("[Error] Missing required permissions")
+            isRunning.set(false)
             return
         }
 
         if (wifiAwareManager?.isAvailable != true) {
             Log.e(TAG, "WiFi Aware is not available")
             notifyMessage("[Error] WiFi Aware not available on this device")
+            isRunning.set(false)
             return
         }
 
@@ -389,20 +392,21 @@ class AndroidWifiAwareManager(private val context: Context) {
             )
 
             // Create server socket (port 0 = auto-assign)
-            val serverSocket = withContext(Dispatchers.IO) { ServerSocket(0) }
+            val serverSocket = withContext(Dispatchers.IO) {
+                ServerSocket(0).apply {
+                    soTimeout = 30000  // 30 second timeout for accept()
+                }
+            }
             val assignedPort = serverSocket.localPort
 
             Log.d(TAG, "[Server] ServerSocket created on port $assignedPort")
 
-            // Send port to client
-            val portMessage = DeviceIdentity.createPortMessage(assignedPort)
-            publishSession?.sendMessage(
-                    peerHandle,
-                    System.currentTimeMillis().toInt(),
-                    portMessage.toByteArray()
-            )
-
-            Log.d(TAG, "[Server] Port message sent to client: $assignedPort")
+            // CRITICAL FIX: Start accepting connections in background BEFORE sending port
+            // This eliminates the race condition where client tries to connect before server is ready
+            val acceptDeferred = scope.async(Dispatchers.IO) {
+                Log.d(TAG, "[Server] Accept started - waiting for client on port $assignedPort")
+                serverSocket.accept()
+            }
 
             // Create network specifier with port
             val session = publishSession ?: throw Exception("Publish session is null")
@@ -454,13 +458,28 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             connectivityManager.requestNetwork(networkRequest, networkCallback)
 
-            // Wait for network
+            // Send port to client FIRST so they can make their network request
+            // WiFi Aware data paths require BOTH sides to request the network
+            val portMessage = DeviceIdentity.createPortMessage(assignedPort)
+            publishSession?.sendMessage(
+                    peerHandle,
+                    System.currentTimeMillis().toInt(),
+                    portMessage.toByteArray()
+            )
+            Log.d(TAG, "[Server] Port message sent to client: $assignedPort (awaiting network)")
+
+            // NOW wait for network - it becomes available when client also requests
             network = callbackDeferred.await()
+            Log.d(TAG, "[Server] Network available")
 
-            Log.d(TAG, "[Server] Waiting for client connection on port $assignedPort")
-
-            // Accept client connection
-            val clientSocket = withContext(Dispatchers.IO) { serverSocket.accept() }
+            // Wait for client connection (accept was already started)
+            val clientSocket = try {
+                acceptDeferred.await()
+            } catch (e: Exception) {
+                serverSocket.close()
+                connectivityManager.unregisterNetworkCallback(networkCallback)
+                throw Exception("Accept failed: ${e.message}")
+            }
 
             Log.d(TAG, "[Server] Client connected: ${clientSocket.remoteSocketAddress}")
 
@@ -498,6 +517,11 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             // Start message listener
             startMessageListener(remoteDeviceId)
+        } catch (e: CancellationException) {
+            // Job was cancelled (e.g., during refresh/stop) - this is expected, don't show error
+            Log.d(TAG, "[Server] Connection setup cancelled for ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            pendingHandshakes.remove(peerHandle)
+            throw e  // Re-throw to properly propagate cancellation
         } catch (e: Exception) {
             Log.e(TAG, "[Server] Connection setup failed: ${e.message}", e)
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
@@ -643,7 +667,7 @@ class AndroidWifiAwareManager(private val context: Context) {
                     try {
                         withContext(Dispatchers.IO) {
                             val sock = net.socketFactory.createSocket()
-                            sock.connect(InetSocketAddress(ipv6, serverPort), 10000)
+                            sock.connect(InetSocketAddress(ipv6, serverPort), 15000)  // 15s timeout
                             sock
                         }
                     } catch (e: Exception) {
@@ -687,6 +711,11 @@ class AndroidWifiAwareManager(private val context: Context) {
 
             // Start message listener
             startMessageListener(remoteDeviceId)
+        } catch (e: CancellationException) {
+            // Job was cancelled (e.g., during refresh/stop) - this is expected, don't show error
+            Log.d(TAG, "[Client] Connection setup cancelled for ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            pendingHandshakes.remove(peerHandle)
+            throw e  // Re-throw to properly propagate cancellation
         } catch (e: Exception) {
             Log.e(TAG, "[Client] Connection setup failed: ${e.message}", e)
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
