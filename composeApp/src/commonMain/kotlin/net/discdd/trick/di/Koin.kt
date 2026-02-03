@@ -3,6 +3,7 @@ package net.discdd.trick.di
 import net.discdd.trick.TrickDatabase
 import net.discdd.trick.data.ContactRepository
 import net.discdd.trick.data.ContactRepositoryImpl
+import net.discdd.trick.screens.chat.ChatViewModel
 import net.discdd.trick.screens.contacts.ContactsListViewModel
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.viewModel
@@ -21,6 +22,9 @@ fun initKoin(database: TrickDatabase? = null) {
                     
                     // Provide ContactsListViewModel
                     viewModel { ContactsListViewModel(get()) }
+
+                    // Provide ChatViewModel with contactId from navigation
+                    viewModel { (contactId: String) -> ChatViewModel(contactId, get()) }
                 }
             }
         )

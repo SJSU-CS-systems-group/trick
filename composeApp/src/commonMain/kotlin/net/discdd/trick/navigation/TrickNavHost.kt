@@ -26,10 +26,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
+import net.discdd.trick.screens.chat.ChatScreen
 import net.discdd.trick.screens.contacts.ContactsListScreen
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageType
-import net.discdd.trick.screens.messaging.MessagingScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
 
 /**
@@ -79,8 +79,9 @@ fun TrickNavHost(
         if (permissionsGranted) {
             discoveryStatus.value = "Starting..."
             debugLogs.add("[UI] Starting discovery...")
-            wifiAwareService.startDiscovery { chatMessage ->
+            wifiAwareService.startDiscovery { chatMessage, peerId ->
                 val wasEncrypted = chatMessage.encryption_version != null
+                val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
                 val textContent = chatMessage.text_content
                 if (textContent != null) {
                     val msg = textContent.text
@@ -93,7 +94,8 @@ fun TrickNavHost(
                             content = msg,
                             isSent = false,
                             isServiceMessage = msg.startsWith("Service discovered:"),
-                            isEncrypted = wasEncrypted
+                            isEncrypted = wasEncrypted,
+                            peerId = effectivePeerId
                         )
                     )
                     lastReceivedMessage.value = msg
@@ -114,7 +116,8 @@ fun TrickNavHost(
                             type = MessageType.IMAGE,
                             imageData = imageData,
                             filename = filename,
-                            isEncrypted = wasEncrypted
+                            isEncrypted = wasEncrypted,
+                            peerId = effectivePeerId
                         )
                     )
                     lastReceivedMessage.value = filename
@@ -134,7 +137,8 @@ fun TrickNavHost(
         wifiAwareService.stopDiscovery()
         debugLogs.add("[UI] Discovery stopped. Restarting...")
         discoveryStatus.value = "Restarting..."
-        wifiAwareService.startDiscovery { chatMessage ->
+        wifiAwareService.startDiscovery { chatMessage, peerId ->
+            val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
             val textContent = chatMessage.text_content
             if (textContent != null) {
                 val msg = textContent.text
@@ -144,7 +148,8 @@ fun TrickNavHost(
                     Message(
                         content = msg,
                         isSent = false,
-                        isServiceMessage = msg.startsWith("Service discovered:")
+                        isServiceMessage = msg.startsWith("Service discovered:"),
+                        peerId = effectivePeerId
                     )
                 )
                 lastReceivedMessage.value = msg
@@ -162,7 +167,8 @@ fun TrickNavHost(
                         isServiceMessage = false,
                         type = MessageType.IMAGE,
                         imageData = imageData,
-                        filename = filename
+                        filename = filename,
+                        peerId = effectivePeerId
                     )
                 )
                 lastReceivedMessage.value = filename
@@ -200,12 +206,14 @@ fun TrickNavHost(
             )
         ) { backStackEntry ->
             val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val filteredMessages = messages.filter { it.peerId == contactId }
+            val isContactConnected = contactId in connectedPeerIds
             val onPickImageForScreen: (() -> Unit)? = if (onPickImage != null) {
                 {
                     onPickImage { data, filename, mimeType ->
                         debugLogs.add("[App] Image picked: $filename (${data.size} bytes)")
                         println("[App] Image picked: $filename")
-                        wifiAwareService.sendPicture(data, filename, mimeType)
+                        wifiAwareService.sendPictureToPeer(data, filename, mimeType, contactId)
                         messages.add(
                             Message(
                                 content = "[Image]",
@@ -213,7 +221,8 @@ fun TrickNavHost(
                                 isServiceMessage = false,
                                 type = MessageType.IMAGE,
                                 imageData = data,
-                                filename = filename
+                                filename = filename,
+                                peerId = contactId
                             )
                         )
                         lastSentMessage.value = filename
@@ -221,18 +230,21 @@ fun TrickNavHost(
                 }
             } else null
 
-            MessagingScreen(
-                messages = messages,
+            ChatScreen(
+                contactId = contactId,
+                messages = filteredMessages,
+                isContactConnected = isContactConnected,
                 onSend = { msg ->
                     debugLogs.add("[App] Sending message: $msg")
                     println("[App] Sending message: $msg")
-                    wifiAwareService.sendMessage(msg)
+                    wifiAwareService.sendMessageToPeer(msg, contactId)
                     messages.add(
                         Message(
                             content = msg,
                             isSent = true,
                             isServiceMessage = false,
-                            type = MessageType.TEXT
+                            type = MessageType.TEXT,
+                            peerId = contactId
                         )
                     )
                     lastSentMessage.value = msg
@@ -240,7 +252,7 @@ fun TrickNavHost(
                 onSendPicture = { imageData, filename, mimeType ->
                     debugLogs.add("[App] Sending picture: $filename (${imageData.size} bytes)")
                     println("[App] Sending picture: $filename")
-                    wifiAwareService.sendPicture(imageData, filename, mimeType)
+                    wifiAwareService.sendPictureToPeer(imageData, filename, mimeType, contactId)
                     messages.add(
                         Message(
                             content = "[Image]",
@@ -248,21 +260,14 @@ fun TrickNavHost(
                             isServiceMessage = false,
                             type = MessageType.IMAGE,
                             imageData = imageData,
-                            filename = filename
+                            filename = filename,
+                            peerId = contactId
                         )
                     )
                     lastSentMessage.value = filename ?: "[Image]"
                 },
-                debugLogs = debugLogs,
-                discoveryStatus = discoveryStatus.value,
-                lastReceivedMessage = lastReceivedMessage.value,
-                lastSentMessage = lastSentMessage.value,
-                onRefresh = { refreshDiscovery() },
-                localDeviceId = localDeviceId.value,
-                connectedPeerIds = connectedPeerIds.toList(),
-                onPickImage = onPickImageForScreen,
-                onNavigateToKeyExchange = { navController.navigate(Screen.KeyExchange.route) },
-                onNavigateToContacts = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onPickImage = onPickImageForScreen
             )
         }
 

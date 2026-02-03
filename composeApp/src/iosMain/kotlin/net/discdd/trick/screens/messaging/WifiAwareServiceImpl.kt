@@ -8,7 +8,7 @@ import net.discdd.trick.messaging.TextContent
  * WiFi Aware is Android-specific, so this is a no-op implementation
  */
 class WifiAwareServiceImpl : WifiAwareService {
-    override fun startDiscovery(onMessageReceived: (ChatMessage) -> Unit) {
+    override fun startDiscovery(onMessageReceived: (ChatMessage, String?) -> Unit) {
         // WiFi Aware is not available on iOS - send a system message
         val systemMessage = ChatMessage(
             message_id = "system-ios",
@@ -16,7 +16,7 @@ class WifiAwareServiceImpl : WifiAwareService {
             sender_id = "system",
             text_content = TextContent("[System] WiFi Aware is only available on Android")
         )
-        onMessageReceived(systemMessage)
+        onMessageReceived(systemMessage, null)
     }
 
     override fun stopDiscovery() {
@@ -29,6 +29,14 @@ class WifiAwareServiceImpl : WifiAwareService {
 
     override fun sendPicture(imageData: ByteArray, filename: String?, mimeType: String?) {
         // No-op
+    }
+
+    override fun sendMessageToPeer(message: String, peerId: String) {
+        // No-op on iOS
+    }
+
+    override fun sendPictureToPeer(imageData: ByteArray, filename: String?, mimeType: String?, peerId: String) {
+        // No-op on iOS
     }
 
     override fun isPeerConnected(): Boolean {
