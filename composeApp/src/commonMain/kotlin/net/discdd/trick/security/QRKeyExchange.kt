@@ -5,18 +5,47 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.discdd.trick.libsignal.LibSignalManager
 import net.discdd.trick.libsignal.PublicKey
+import net.discdd.trick.util.ShortIdGenerator
 
 /**
  * Payload structure for QR code key exchange.
- * Contains the device ID, public key, timestamp, and signature for verification.
+ * Contains the device ID, public key, timestamp, signature, and optional shortId for trcky.org URL.
  */
 @Serializable
 data class KeyExchangePayload(
     val deviceId: String,
     val publicKeyHex: String,
     val timestamp: Long,
-    val signatureHex: String
+    val signatureHex: String,
+    val shortId: String? = null
 )
+
+/**
+ * Result of generating a QR payload, including the JSON and shortId for building the display URL.
+ */
+data class KeyExchangeQRResult(
+    val payloadJson: String,
+    val shortId: String
+)
+
+/** Base URL for trcky.org key exchange links (align with Contact.getUrl()). */
+const val TRCKY_ORG_BASE_URL = "https://trcky.org"
+
+/**
+ * Parse a trcky.org URL and return the shortId path segment, or null if not a trcky.org URL.
+ * Accepts: trcky.org/xyz, https://trcky.org/xyz, http://trcky.org/xyz (with optional trailing path/query).
+ */
+fun parseTrckyShortId(input: String): String? {
+    val trimmed = input.trim()
+    val withoutScheme = when {
+        trimmed.startsWith("https://trcky.org/", ignoreCase = true) -> trimmed.removePrefix("https://trcky.org/")
+        trimmed.startsWith("http://trcky.org/", ignoreCase = true) -> trimmed.removePrefix("http://trcky.org/")
+        trimmed.startsWith("trcky.org/", ignoreCase = true) -> trimmed.removePrefix("trcky.org/")
+        else -> return null
+    }
+    val shortId = withoutScheme.substringBefore('/').substringBefore('?').trim()
+    return shortId.ifEmpty { null }
+}
 
 /**
  * QRKeyExchange handles the generation and verification of QR codes for key exchange.
@@ -37,25 +66,27 @@ object QRKeyExchange {
      * - Public key (hex encoded)
      * - Timestamp (for expiration)
      * - Signature (to prevent tampering/impersonation)
+     * - ShortId (for trcky.org URL)
      *
      * @param keyManager KeyManager to retrieve identity key pair
      * @param libSignalManager LibSignalManager for signing
      * @param deviceId The device's unique identifier
-     * @return JSON string to encode in QR code
+     * @return KeyExchangeQRResult with payloadJson and shortId for display URL
      */
     fun generateQRPayload(
         keyManager: KeyManager,
         libSignalManager: LibSignalManager,
         deviceId: String
-    ): String {
+    ): KeyExchangeQRResult {
         val keyPair = keyManager.getIdentityKeyPair()
             ?: keyManager.generateIdentityKeyPair()
 
         val timestamp = currentTimeMillis()
         val publicKeyHex = keyPair.publicKey.data.toHexString()
+        val shortId = ShortIdGenerator.generateShortId(keyPair.publicKey)
 
-        // Sign the payload to prevent tampering
-        val dataToSign = "$deviceId:$publicKeyHex:$timestamp".encodeToByteArray()
+        // Sign the payload to prevent tampering (include shortId for new payloads)
+        val dataToSign = "$deviceId:$publicKeyHex:$timestamp:$shortId".encodeToByteArray()
         val signature = libSignalManager.sign(keyPair.privateKey, dataToSign)
         val signatureHex = signature.toHexString()
 
@@ -63,10 +94,12 @@ object QRKeyExchange {
             deviceId = deviceId,
             publicKeyHex = publicKeyHex,
             timestamp = timestamp,
-            signatureHex = signatureHex
+            signatureHex = signatureHex,
+            shortId = shortId
         )
 
-        return Json.encodeToString(payload)
+        val payloadJson = Json.encodeToString(payload)
+        return KeyExchangeQRResult(payloadJson = payloadJson, shortId = shortId)
     }
 
     /**
@@ -104,8 +137,12 @@ object QRKeyExchange {
             val publicKeyBytes = data.publicKeyHex.hexToByteArray()
             val signatureBytes = data.signatureHex.hexToByteArray()
 
-            // Verify signature
-            val dataToVerify = "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}".encodeToByteArray()
+            // Verify signature (match format used when signing: with or without shortId)
+            val dataToVerify = if (data.shortId != null) {
+                "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}:${data.shortId}".encodeToByteArray()
+            } else {
+                "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}".encodeToByteArray()
+            }
             val publicKey = PublicKey(publicKeyBytes)
 
             if (!libSignalManager.verify(publicKey, dataToVerify, signatureBytes)) {

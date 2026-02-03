@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 fun KeyExchangeScreen(
     deviceId: String,
     qrCodePayload: String,
+    displayUrl: String,
+    onCopyUrl: (String) -> Unit,
+    onShareUrl: (String) -> Unit,
     trustedPeers: List<String>,
     onNavigateBack: () -> Unit,
     onScanQR: () -> Unit,
@@ -88,6 +91,41 @@ fun KeyExchangeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+
+                    // trcky.org URL with Copy and Share (second option; hide when displayUrl is blank)
+                    if (displayUrl.isNotBlank()) {
+                        Text(
+                            text = "Or share this link to add peer",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 16.dp)
+                        )
+                        Text(
+                            text = displayUrl,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .fillMaxWidth(),
+                            maxLines = 1
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            FilledTonalButton(
+                                onClick = { onCopyUrl(displayUrl) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text("Copy")
+                            }
+                            FilledTonalButton(onClick = { onShareUrl(displayUrl) }) {
+                                Text("Share")
+                            }
+                        }
+                    }
                 }
             }
 
