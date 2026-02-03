@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import kotlin.coroutines.cancellation.CancellationException
 import okio.ByteString.Companion.toByteString
@@ -80,6 +81,7 @@ class AndroidWifiAwareManager(private val context: Context) {
 
     // State
     private val isRunning = AtomicBoolean(false)
+    private val desiredPeerId = AtomicReference<String?>(null)
 
     init {
         wifiAwareManager = context.getSystemService(Context.WIFI_AWARE_SERVICE) as? WifiAwareManager
@@ -273,21 +275,32 @@ class AndroidWifiAwareManager(private val context: Context) {
             return
         }
 
-        // Negotiate role
+        // Only establish connection when this peer is the desired one
+        val desired = desiredPeerId.get()
+        if (desired != remoteDeviceId) {
+            Log.d(
+                    TAG,
+                    "Discovered ${DeviceIdentity.getShortId(remoteDeviceId)} but not desired peer, skipping connection"
+            )
+            return
+        }
+
+        runConnectionFlowForPeer(peerHandle, remoteDeviceId)
+    }
+
+    /** Run role negotiation and initiate connection (handshake or wait). */
+    private fun runConnectionFlowForPeer(peerHandle: PeerHandle, remoteDeviceId: String) {
         val role = DeviceIdentity.negotiateRole(localDeviceId, remoteDeviceId)
         Log.d(TAG, "Negotiated role: $role with ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
-        // Initiate connection based on role
         when (role) {
             Role.SERVER -> {
-                // As server, wait for client's handshake
                 Log.d(
                         TAG,
                         "Waiting for handshake from client ${DeviceIdentity.getShortId(remoteDeviceId)}"
                 )
             }
             Role.CLIENT -> {
-                // As client, send handshake to initiate connection
                 if (!pendingHandshakes.contains(peerHandle)) {
                     sendHandshake(peerHandle, remoteDeviceId)
                 }
@@ -1136,6 +1149,32 @@ class AndroidWifiAwareManager(private val context: Context) {
 
     /** Get local device ID */
     fun getDeviceId(): String = localDeviceId
+
+    /**
+     * Set the peer to connect to when discovered. Only this peer will get connection establishment.
+     * If the peer was already discovered, connection flow is triggered immediately.
+     */
+    fun setDesiredPeerId(peerId: String?) {
+        desiredPeerId.set(peerId)
+        if (peerId != null) {
+            tryConnectToDesiredPeer()
+        }
+    }
+
+    /** If desired peer is set and already discovered (but not connected), run connection flow. */
+    private fun tryConnectToDesiredPeer() {
+        val desired = desiredPeerId.get() ?: return
+        if (connectionPool.hasConnection(desired)) return
+
+        val snapshot = peerDeviceIds.entries.toList()
+        for ((peerHandle, deviceId) in snapshot) {
+            if (deviceId == desired && !connectionPool.hasConnection(deviceId)) {
+                Log.d(TAG, "Desired peer ${DeviceIdentity.getShortId(desired)} already discovered, connecting now")
+                runConnectionFlowForPeer(peerHandle, deviceId)
+                return
+            }
+        }
+    }
 
     /** Stop discovery and cleanup all connections */
     fun stopDiscovery() {

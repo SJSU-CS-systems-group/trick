@@ -54,5 +54,9 @@ class WifiAwareServiceImpl : WifiAwareService {
     override fun getConnectedPeers(): List<String> {
         return emptyList()
     }
+
+    override fun setDesiredPeerId(peerId: String?) {
+        // No-op on iOS (WiFi Aware not supported)
+    }
 }
 

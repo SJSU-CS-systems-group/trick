@@ -70,4 +70,9 @@ class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
         Log.d("WifiAwareServiceImpl", "Sending picture to specific peer: ${peerId.take(8)}")
         manager.sendPictureToPeer(imageData, filename, mimeType, peerId)
     }
+
+    override fun setDesiredPeerId(peerId: String?) {
+        Log.d("WifiAwareServiceImpl", "Set desired peer: ${peerId?.take(8) ?: "null"}")
+        manager.setDesiredPeerId(peerId)
+    }
 }

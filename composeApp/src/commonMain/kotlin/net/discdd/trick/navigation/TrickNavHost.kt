@@ -185,6 +185,8 @@ fun TrickNavHost(
         composable(Screen.ContactsList.route) {
             ContactsListScreen(
                 onContactClick = { contact ->
+                    wifiAwareService.setDesiredPeerId(contact.id)
+                    refreshDiscovery()
                     navController.navigate(Screen.Chat.createRoute(contact.id))
                 },
                 onAddContactClick = {
@@ -194,6 +196,8 @@ fun TrickNavHost(
                 },
                 onTestMessagingClick = {
                     // Temporary bypass: go directly to messaging with a test contact ID
+                    wifiAwareService.setDesiredPeerId("test-contact")
+                    refreshDiscovery()
                     navController.navigate(Screen.Chat.createRoute("test-contact"))
                 }
             )
@@ -266,7 +270,10 @@ fun TrickNavHost(
                     )
                     lastSentMessage.value = filename ?: "[Image]"
                 },
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    wifiAwareService.setDesiredPeerId(null)
+                    navController.popBackStack()
+                },
                 onPickImage = onPickImageForScreen
             )
         }
