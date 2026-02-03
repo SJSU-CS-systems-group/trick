@@ -37,7 +37,8 @@ data class Message(
         val type: MessageType = MessageType.TEXT,
         val imageData: ByteArray? = null,
         val filename: String? = null,
-        val isEncrypted: Boolean = false
+        val isEncrypted: Boolean = false,
+        val peerId: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -55,6 +56,7 @@ data class Message(
         } else if (other.imageData != null) return false
         if (filename != other.filename) return false
         if (isEncrypted != other.isEncrypted) return false
+        if (peerId != other.peerId) return false
 
         return true
     }
@@ -67,6 +69,7 @@ data class Message(
         result = 31 * result + (imageData?.contentHashCode() ?: 0)
         result = 31 * result + (filename?.hashCode() ?: 0)
         result = 31 * result + isEncrypted.hashCode()
+        result = 31 * result + (peerId?.hashCode() ?: 0)
         return result
     }
 }
@@ -328,7 +331,7 @@ fun MessagingScreen(
 }
 
 @Composable
-private fun MessageBubble(message: Message) {
+fun MessageBubble(message: Message) {
     val isSystemMessage = message.content.startsWith("[System]")
     val isErrorMessage = message.content.startsWith("[Error]")
 

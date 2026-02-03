@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.discdd.trick.data.ContactRepository
 import net.discdd.trick.libsignal.createLibSignalManager
 import net.discdd.trick.screens.KeyExchangeScreen
 import net.discdd.trick.screens.QRScannerScreen
@@ -19,6 +20,7 @@ import net.discdd.trick.security.QRKeyExchange
 import net.discdd.trick.security.TRCKY_ORG_BASE_URL
 import net.discdd.trick.security.TrckyOrgPayloadResolver
 import net.discdd.trick.security.parseTrckyShortId
+import org.koin.core.context.GlobalContext
 
 /**
  * Android wrapper for KeyExchangeScreen with KeyManager integration
@@ -30,6 +32,7 @@ fun AndroidKeyExchangeScreen(
     onNavigateBack: () -> Unit
 ) {
     val keyManager = remember { KeyManager(context) }
+    val contactRepository = remember { GlobalContext.get().get<ContactRepository>() }
     val libSignalManager = remember { createLibSignalManager() }
     val payloadResolver = remember { TrckyOrgPayloadResolver() }
     val localContext = LocalContext.current
@@ -85,6 +88,7 @@ fun AndroidKeyExchangeScreen(
                                 Toast.makeText(localContext, message, Toast.LENGTH_LONG).show()
                                 if (success) {
                                     trustedPeers = keyManager.getTrustedPeerIds()
+                                    contactRepository.migrateFromKeyManager(keyManager)
                                 }
                                 showScanner = false
                             }
@@ -120,6 +124,7 @@ fun AndroidKeyExchangeScreen(
             },
             onUntrust = { peerId ->
                 keyManager.removePeerPublicKey(peerId)
+                contactRepository.deleteContact(peerId)
                 trustedPeers = keyManager.getTrustedPeerIds()
                 Toast.makeText(localContext, "Removed trust for $peerId", Toast.LENGTH_SHORT).show()
             }
