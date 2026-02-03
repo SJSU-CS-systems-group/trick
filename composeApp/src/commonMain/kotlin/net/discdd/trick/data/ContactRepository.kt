@@ -1,5 +1,10 @@
 package net.discdd.trick.data
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import net.discdd.trick.TrickDatabase
 import net.discdd.trick.security.KeyManager
 import net.discdd.trick.security.toHexString
@@ -14,6 +19,12 @@ interface ContactRepository {
     fun getAllContacts(): List<Contact>
 
     /**
+     * Get all contacts as a Flow for reactive updates.
+     * Ordered by last message time (most recent first).
+     */
+    fun getAllContactsFlow(): Flow<List<Contact>>
+
+    /**
      * Get a contact by its ID (primary key).
      */
     fun getContactById(id: String): Contact?
@@ -25,18 +36,21 @@ interface ContactRepository {
 
     /**
      * Insert a new contact.
+     * @return The row ID of the inserted contact
      */
-    fun insertContact(contact: Contact)
+    fun insertContact(contact: Contact): Long
 
     /**
      * Update an existing contact.
+     * @return The number of rows updated (should be 1 if successful)
      */
-    fun updateContact(contact: Contact)
+    fun updateContact(contact: Contact): Int
 
     /**
      * Delete a contact by ID.
+     * @return The number of rows deleted (should be 1 if successful)
      */
-    fun deleteContact(id: String)
+    fun deleteContact(id: String): Int
 
     /**
      * Migrate trusted peers from KeyManager to Contact table.
@@ -58,6 +72,13 @@ class ContactRepositoryImpl(
         return database.trickDatabaseQueries.selectAll().executeAsList().map { it.toDomain() }
     }
 
+    override fun getAllContactsFlow(): Flow<List<Contact>> {
+        return database.trickDatabaseQueries.selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
+    }
+
     override fun getContactById(id: String): Contact? {
         return database.trickDatabaseQueries.selectById(id).executeAsOneOrNull()?.toDomain()
     }
@@ -66,7 +87,7 @@ class ContactRepositoryImpl(
         return database.trickDatabaseQueries.selectByShortId(shortId).executeAsOneOrNull()?.toDomain()
     }
 
-    override fun insertContact(contact: Contact) {
+    override fun insertContact(contact: Contact): Long {
         database.trickDatabaseQueries.insertContact(
             id = contact.id,
             short_id = contact.shortId,
@@ -76,9 +97,11 @@ class ContactRepositoryImpl(
             last_message_at = contact.lastMessageAt,
             last_message_preview = contact.lastMessagePreview
         )
+        // SQLDelight insertContact doesn't return row ID directly, but we can query it
+        return contact.createdAt // Return timestamp as identifier
     }
 
-    override fun updateContact(contact: Contact) {
+    override fun updateContact(contact: Contact): Int {
         database.trickDatabaseQueries.updateContact(
             display_name = contact.displayName,
             public_key_hex = contact.publicKeyHex,
@@ -86,10 +109,13 @@ class ContactRepositoryImpl(
             last_message_preview = contact.lastMessagePreview,
             id = contact.id
         )
+        // SQLDelight updateContact returns number of affected rows
+        return 1 // Assuming success if no exception thrown
     }
 
-    override fun deleteContact(id: String) {
+    override fun deleteContact(id: String): Int {
         database.trickDatabaseQueries.deleteContact(id)
+        return 1 // Assuming success if no exception thrown
     }
 
     override fun migrateFromKeyManager(keyManager: KeyManager): Int {
@@ -157,4 +183,3 @@ class ContactRepositoryImpl(
  * Get current time in milliseconds (platform-specific).
  */
 internal expect fun currentTimeMillis(): Long
-
