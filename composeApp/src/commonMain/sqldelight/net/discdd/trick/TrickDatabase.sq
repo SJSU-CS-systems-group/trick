@@ -1,21 +1,18 @@
--- Contact table
-CREATE TABLE Contact (
-    id TEXT NOT NULL PRIMARY KEY,
-    short_id TEXT NOT NULL,
-    display_name TEXT,
-    public_key_hex TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
+-- MessageMetadata table
+-- Stores message-related metadata for contacts (linked by short_id)
+-- Contact info (name, photo, public key) is now stored in Android Contacts
+CREATE TABLE MessageMetadata (
+    short_id TEXT NOT NULL PRIMARY KEY,
     last_message_at INTEGER,
     last_message_preview TEXT
 );
 
-CREATE INDEX Contact_short_id ON Contact(short_id);
-CREATE INDEX Contact_last_message_at ON Contact(last_message_at);
+CREATE INDEX MessageMetadata_last_message_at ON MessageMetadata(last_message_at);
 
 -- Message table
 CREATE TABLE Message (
     id TEXT NOT NULL PRIMARY KEY,
-    contact_id TEXT NOT NULL,
+    short_id TEXT NOT NULL,
     content TEXT NOT NULL,
     type TEXT NOT NULL,
     is_sent INTEGER NOT NULL,
@@ -23,46 +20,40 @@ CREATE TABLE Message (
     timestamp INTEGER NOT NULL,
     image_path TEXT,
     status TEXT NOT NULL,
-    FOREIGN KEY(contact_id) REFERENCES Contact(id) ON DELETE CASCADE
+    FOREIGN KEY(short_id) REFERENCES MessageMetadata(short_id) ON DELETE CASCADE
 );
 
-CREATE INDEX Message_contact_id ON Message(contact_id);
+CREATE INDEX Message_short_id ON Message(short_id);
 CREATE INDEX Message_timestamp ON Message(timestamp);
-CREATE INDEX Message_contact_timestamp ON Message(contact_id, timestamp);
+CREATE INDEX Message_short_id_timestamp ON Message(short_id, timestamp);
 
--- Contact queries
-selectAll:
-SELECT * FROM Contact
-ORDER BY last_message_at DESC, created_at DESC;
+-- MessageMetadata queries
+selectAllMetadata:
+SELECT * FROM MessageMetadata
+ORDER BY last_message_at DESC;
 
-selectById:
-SELECT * FROM Contact
-WHERE id = ?;
-
-selectByShortId:
-SELECT * FROM Contact
+selectMetadataByShortId:
+SELECT * FROM MessageMetadata
 WHERE short_id = ?;
 
-insertContact:
-INSERT INTO Contact(id, short_id, display_name, public_key_hex, created_at, last_message_at, last_message_preview)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+insertMetadata:
+INSERT OR REPLACE INTO MessageMetadata(short_id, last_message_at, last_message_preview)
+VALUES (?, ?, ?);
 
-updateContact:
-UPDATE Contact
-SET display_name = ?,
-    public_key_hex = ?,
-    last_message_at = ?,
+updateMetadata:
+UPDATE MessageMetadata
+SET last_message_at = ?,
     last_message_preview = ?
-WHERE id = ?;
+WHERE short_id = ?;
 
-deleteContact:
-DELETE FROM Contact
-WHERE id = ?;
+deleteMetadata:
+DELETE FROM MessageMetadata
+WHERE short_id = ?;
 
 -- Message queries
-selectMessagesByContact:
+selectMessagesByShortId:
 SELECT * FROM Message
-WHERE contact_id = ?
+WHERE short_id = ?
 ORDER BY timestamp ASC;
 
 selectMessageById:
@@ -75,7 +66,7 @@ ORDER BY timestamp DESC
 LIMIT ?;
 
 insertMessage:
-INSERT INTO Message(id, contact_id, content, type, is_sent, is_encrypted, timestamp, image_path, status)
+INSERT INTO Message(id, short_id, content, type, is_sent, is_encrypted, timestamp, image_path, status)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateMessageStatus:
@@ -87,8 +78,6 @@ deleteMessage:
 DELETE FROM Message
 WHERE id = ?;
 
-deleteMessagesByContact:
+deleteMessagesByShortId:
 DELETE FROM Message
-WHERE contact_id = ?;
-
-
+WHERE short_id = ?;

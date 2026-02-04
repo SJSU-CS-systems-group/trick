@@ -4,18 +4,18 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import net.discdd.trick.data.Contact
-import net.discdd.trick.data.ContactRepository
+import net.discdd.trick.contacts.NativeContactsManager
+import net.discdd.trick.contacts.TrickContact
 
 /**
  * ViewModel for the per-contact Chat screen.
- * Loads the contact by id and exposes it for the app bar (display name / shortId).
+ * Loads the contact by shortId and exposes it for the app bar (display name).
  */
 class ChatViewModel(
-    private val contactId: String,
-    private val contactRepository: ContactRepository
+    private val shortId: String,
+    private val nativeContactsManager: NativeContactsManager
 ) : ViewModel() {
 
-    private val _contact = MutableStateFlow<Contact?>(contactRepository.getContactById(contactId))
-    val contact: StateFlow<Contact?> = _contact.asStateFlow()
+    private val _contact = MutableStateFlow<TrickContact?>(nativeContactsManager.getContactByShortId(shortId))
+    val contact: StateFlow<TrickContact?> = _contact.asStateFlow()
 }

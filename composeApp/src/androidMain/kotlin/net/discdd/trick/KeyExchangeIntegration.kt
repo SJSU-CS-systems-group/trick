@@ -11,16 +11,30 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.discdd.trick.data.ContactRepository
+import net.discdd.trick.contacts.ContactPickerResult
+import net.discdd.trick.contacts.NativeContactsManager
+import net.discdd.trick.contacts.rememberContactPickerLauncher
 import net.discdd.trick.libsignal.createLibSignalManager
 import net.discdd.trick.screens.KeyExchangeScreen
 import net.discdd.trick.screens.QRScannerScreen
+import net.discdd.trick.security.KeyExchangePayload
 import net.discdd.trick.security.KeyManager
 import net.discdd.trick.security.QRKeyExchange
 import net.discdd.trick.security.TRCKY_ORG_BASE_URL
 import net.discdd.trick.security.TrckyOrgPayloadResolver
 import net.discdd.trick.security.parseTrckyShortId
+import net.discdd.trick.util.ShortIdGenerator
 import org.koin.core.context.GlobalContext
+import kotlinx.serialization.json.Json
+
+/**
+ * Pending key exchange data waiting for contact selection.
+ */
+private data class PendingKeyExchange(
+    val deviceId: String,
+    val publicKeyHex: String,
+    val shortId: String
+)
 
 /**
  * Android wrapper for KeyExchangeScreen with KeyManager integration
@@ -32,7 +46,7 @@ fun AndroidKeyExchangeScreen(
     onNavigateBack: () -> Unit
 ) {
     val keyManager = remember { KeyManager(context) }
-    val contactRepository = remember { GlobalContext.get().get<ContactRepository>() }
+    val nativeContactsManager = remember { GlobalContext.get().get<NativeContactsManager>() }
     val libSignalManager = remember { createLibSignalManager() }
     val payloadResolver = remember { TrckyOrgPayloadResolver() }
     val localContext = LocalContext.current
@@ -40,6 +54,9 @@ fun AndroidKeyExchangeScreen(
 
     var showScanner by remember { mutableStateOf(false) }
     var trustedPeers by rememberSaveable { mutableStateOf(emptyList<String>()) }
+
+    // State for pending key exchange (waiting for contact selection)
+    var pendingKeyExchange by remember { mutableStateOf<PendingKeyExchange?>(null) }
 
     // Ensure identity key pair exists
     LaunchedEffect(Unit) {
@@ -59,6 +76,42 @@ fun AndroidKeyExchangeScreen(
     }
     val qrCodePayload = qrResult.payloadJson
     val displayUrl = "$TRCKY_ORG_BASE_URL/${qrResult.shortId}"
+
+    // Contact picker launcher
+    val launchContactPicker = rememberContactPickerLauncher { result: ContactPickerResult? ->
+        val pending = pendingKeyExchange
+        if (result != null && pending != null) {
+            // Link the key data to the selected contact (including deviceId for WiFi Aware matching)
+            val success = nativeContactsManager.linkTrickDataToContact(
+                nativeContactId = result.rawContactId,
+                shortId = pending.shortId,
+                publicKeyHex = pending.publicKeyHex,
+                deviceId = pending.deviceId
+            )
+
+            if (success) {
+                Toast.makeText(
+                    localContext,
+                    "Key linked to ${result.displayName}",
+                    Toast.LENGTH_LONG
+                ).show()
+                trustedPeers = keyManager.getTrustedPeerIds()
+            } else {
+                Toast.makeText(
+                    localContext,
+                    "Failed to link key to contact",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } else if (result == null && pending != null) {
+            Toast.makeText(
+                localContext,
+                "Contact selection cancelled",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        pendingKeyExchange = null
+    }
 
     if (showScanner) {
         QRScannerScreen(
@@ -85,12 +138,36 @@ fun AndroidKeyExchangeScreen(
                                 libSignalManager = libSignalManager
                             )
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(localContext, message, Toast.LENGTH_LONG).show()
                                 if (success) {
-                                    trustedPeers = keyManager.getTrustedPeerIds()
-                                    contactRepository.migrateFromKeyManager(keyManager)
+                                    // Parse payload to get key data for contact linking
+                                    try {
+                                        val data = Json.decodeFromString<KeyExchangePayload>(payload)
+                                        val peerShortId = data.shortId ?: ShortIdGenerator.generateShortIdFromHex(data.publicKeyHex)
+
+                                        // Store pending exchange and launch contact picker
+                                        pendingKeyExchange = PendingKeyExchange(
+                                            deviceId = data.deviceId,
+                                            publicKeyHex = data.publicKeyHex,
+                                            shortId = peerShortId
+                                        )
+
+                                        Toast.makeText(
+                                            localContext,
+                                            "Key verified! Select a contact to link.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+
+                                        showScanner = false
+                                        launchContactPicker()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(localContext, message, Toast.LENGTH_LONG).show()
+                                        trustedPeers = keyManager.getTrustedPeerIds()
+                                        showScanner = false
+                                    }
+                                } else {
+                                    Toast.makeText(localContext, message, Toast.LENGTH_LONG).show()
+                                    showScanner = false
                                 }
-                                showScanner = false
                             }
                         }
                     }
@@ -123,8 +200,16 @@ fun AndroidKeyExchangeScreen(
                 showScanner = true
             },
             onUntrust = { peerId ->
+                // Remove from KeyManager
                 keyManager.removePeerPublicKey(peerId)
-                contactRepository.deleteContact(peerId)
+
+                // Get shortId for the peer and unlink from native contacts
+                val peerPublicKey = keyManager.getPeerPublicKey(peerId)
+                if (peerPublicKey != null) {
+                    val peerShortId = ShortIdGenerator.generateShortId(peerPublicKey)
+                    nativeContactsManager.unlinkTrickData(peerShortId)
+                }
+
                 trustedPeers = keyManager.getTrustedPeerIds()
                 Toast.makeText(localContext, "Removed trust for $peerId", Toast.LENGTH_SHORT).show()
             }

@@ -22,15 +22,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import net.discdd.trick.data.Contact
+import net.discdd.trick.contacts.TrickContact
+import net.discdd.trick.data.currentTimeMillis
 
 /**
  * A single contact item in the contacts list.
- * Displays avatar placeholder, name, last message preview, and timestamp.
+ * Displays avatar (from Android contacts or initials), name, last message preview, and timestamp.
  */
 @Composable
 fun ContactItem(
-    contact: Contact,
+    contact: TrickContact,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -46,7 +47,7 @@ fun ContactItem(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar placeholder with initials
+            // Avatar (photo or initials)
             ContactAvatar(contact = contact)
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -56,9 +57,9 @@ fun ContactItem(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Display name or short ID as fallback
+                // Display name from Android contacts
                 Text(
-                    text = contact.displayName ?: contact.shortId,
+                    text = contact.displayName,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -89,15 +90,18 @@ fun ContactItem(
 }
 
 /**
- * Circular avatar placeholder with initials.
+ * Circular avatar - shows initials as placeholder.
+ * Photo display requires platform-specific image loading (e.g., Coil on Android).
  */
 @Composable
 private fun ContactAvatar(
-    contact: Contact,
+    contact: TrickContact,
     modifier: Modifier = Modifier
 ) {
-    val initials = getInitials(contact.displayName ?: contact.shortId)
-    
+    val initials = getInitials(contact.displayName)
+
+    // For now, show initials as placeholder
+    // Photo loading from photoUri would require platform-specific image loading
     Box(
         modifier = modifier
             .size(48.dp)
@@ -115,7 +119,7 @@ private fun ContactAvatar(
 }
 
 /**
- * Get initials from a name or ID.
+ * Get initials from a name.
  * Returns up to 2 characters.
  */
 private fun getInitials(name: String): String {
@@ -131,14 +135,14 @@ private fun getInitials(name: String): String {
  * Format a timestamp as relative time (e.g., "2m", "2h", "Yesterday", "5d").
  */
 private fun formatRelativeTime(timestamp: Long): String {
-    val now = net.discdd.trick.data.currentTimeMillis()
+    val now = currentTimeMillis()
     val diff = now - timestamp
-    
+
     val seconds = diff / 1000
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
-    
+
     return when {
         minutes < 1 -> "Now"
         minutes < 60 -> "${minutes}m"
@@ -148,4 +152,3 @@ private fun formatRelativeTime(timestamp: Long): String {
         else -> "${days / 7}w"
     }
 }
-

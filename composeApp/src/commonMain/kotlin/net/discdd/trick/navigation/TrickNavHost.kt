@@ -185,20 +185,22 @@ fun TrickNavHost(
         composable(Screen.ContactsList.route) {
             ContactsListScreen(
                 onContactClick = { contact ->
-                    wifiAwareService.setDesiredPeerId(contact.id)
+                    // Use deviceId for WiFi Aware peer matching (fallback to shortId for backward compatibility)
+                    val peerId = contact.deviceId ?: contact.shortId
+                    wifiAwareService.setDesiredPeerId(peerId)
                     refreshDiscovery()
-                    navController.navigate(Screen.Chat.createRoute(contact.id))
+                    navController.navigate(Screen.Chat.createRoute(contact.shortId, peerId))
                 },
                 onAddContactClick = {
-                    // TODO: Navigate to add contact screen when implemented
-                    // For now, navigate to key exchange as a placeholder
+                    // Navigate to key exchange to add a new contact
                     navController.navigate(Screen.KeyExchange.route)
                 },
                 onTestMessagingClick = {
                     // Temporary bypass: go directly to messaging with a test contact ID
-                    wifiAwareService.setDesiredPeerId("test-contact")
+                    val testPeerId = "test-contact"
+                    wifiAwareService.setDesiredPeerId(testPeerId)
                     refreshDiscovery()
-                    navController.navigate(Screen.Chat.createRoute("test-contact"))
+                    navController.navigate(Screen.Chat.createRoute(testPeerId, testPeerId))
                 }
             )
         }
@@ -206,18 +208,24 @@ fun TrickNavHost(
         composable(
             route = Screen.Chat.route,
             arguments = listOf(
-                navArgument("contactId") { type = NavType.StringType }
+                navArgument("shortId") { type = NavType.StringType },
+                navArgument("peerId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val filteredMessages = messages.filter { it.peerId == contactId }
-            val isContactConnected = contactId in connectedPeerIds
+            val shortId = backStackEntry.arguments?.getString("shortId") ?: ""
+            // peerId is used for WiFi Aware operations (deviceId when available, otherwise shortId)
+            val peerId = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("peerId") ?: shortId,
+                "UTF-8"
+            )
+            val filteredMessages = messages.filter { it.peerId == peerId }
+            val isContactConnected = peerId in connectedPeerIds
             val onPickImageForScreen: (() -> Unit)? = if (onPickImage != null) {
                 {
                     onPickImage { data, filename, mimeType ->
                         debugLogs.add("[App] Image picked: $filename (${data.size} bytes)")
                         println("[App] Image picked: $filename")
-                        wifiAwareService.sendPictureToPeer(data, filename, mimeType, contactId)
+                        wifiAwareService.sendPictureToPeer(data, filename, mimeType, peerId)
                         messages.add(
                             Message(
                                 content = "[Image]",
@@ -226,7 +234,7 @@ fun TrickNavHost(
                                 type = MessageType.IMAGE,
                                 imageData = data,
                                 filename = filename,
-                                peerId = contactId
+                                peerId = peerId
                             )
                         )
                         lastSentMessage.value = filename
@@ -235,20 +243,20 @@ fun TrickNavHost(
             } else null
 
             ChatScreen(
-                contactId = contactId,
+                shortId = shortId,
                 messages = filteredMessages,
                 isContactConnected = isContactConnected,
                 onSend = { msg ->
                     debugLogs.add("[App] Sending message: $msg")
                     println("[App] Sending message: $msg")
-                    wifiAwareService.sendMessageToPeer(msg, contactId)
+                    wifiAwareService.sendMessageToPeer(msg, peerId)
                     messages.add(
                         Message(
                             content = msg,
                             isSent = true,
                             isServiceMessage = false,
                             type = MessageType.TEXT,
-                            peerId = contactId
+                            peerId = peerId
                         )
                     )
                     lastSentMessage.value = msg
@@ -256,7 +264,7 @@ fun TrickNavHost(
                 onSendPicture = { imageData, filename, mimeType ->
                     debugLogs.add("[App] Sending picture: $filename (${imageData.size} bytes)")
                     println("[App] Sending picture: $filename")
-                    wifiAwareService.sendPictureToPeer(imageData, filename, mimeType, contactId)
+                    wifiAwareService.sendPictureToPeer(imageData, filename, mimeType, peerId)
                     messages.add(
                         Message(
                             content = "[Image]",
@@ -265,7 +273,7 @@ fun TrickNavHost(
                             type = MessageType.IMAGE,
                             imageData = imageData,
                             filename = filename,
-                            peerId = contactId
+                            peerId = peerId
                         )
                     )
                     lastSentMessage.value = filename ?: "[Image]"

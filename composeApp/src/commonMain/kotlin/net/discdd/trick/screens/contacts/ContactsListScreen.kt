@@ -30,17 +30,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import net.discdd.trick.data.Contact
+import net.discdd.trick.contacts.TrickContact
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main contacts list screen - the home screen of the app.
- * Displays all contacts sorted by last message timestamp.
+ * Displays all contacts that have exchanged keys, sorted by last message timestamp.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsListScreen(
-    onContactClick: (Contact) -> Unit,
+    onContactClick: (TrickContact) -> Unit,
     onAddContactClick: () -> Unit,
     onTestMessagingClick: (() -> Unit)? = null,  // Temporary bypass for testing
     viewModel: ContactsListViewModel = koinViewModel()
@@ -114,14 +114,14 @@ fun ContactsListScreen(
  */
 @Composable
 private fun ContactsList(
-    contacts: List<Contact>,
-    onContactClick: (Contact) -> Unit,
+    contacts: List<TrickContact>,
+    onContactClick: (TrickContact) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier) {
         items(
             items = contacts,
-            key = { it.id }
+            key = { it.shortId }
         ) { contact ->
             ContactItem(
                 contact = contact,
@@ -153,23 +153,21 @@ private fun EmptyContactsState(
             modifier = Modifier.padding(bottom = 16.dp),
             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
         )
-        
+
         Text(
             text = "No contacts yet",
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         Text(
-            text = "Tap + to add a new contact",
+            text = "Tap + to exchange keys with a contact",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
         )
     }
 }
-
-
