@@ -26,7 +26,20 @@ object ShortIdGenerator {
     fun generateShortId(publicKey: PublicKey): String {
         // Convert public key to hex string
         val publicKeyHex = publicKey.data.toHexString()
+        return generateShortIdFromHex(publicKeyHex)
+    }
 
+    /**
+     * Generate a 12-character hexadecimal short ID from a public key hex string.
+     *
+     * Process:
+     * 1. Compute SHA-256 hash of the hex string
+     * 2. Take first 12 characters of the hash (lowercase)
+     *
+     * @param publicKeyHex The public key in hexadecimal format
+     * @return 12-character lowercase hexadecimal string
+     */
+    fun generateShortIdFromHex(publicKeyHex: String): String {
         // Compute SHA-256 hash
         val hashBytes = sha256(publicKeyHex.encodeToByteArray())
 

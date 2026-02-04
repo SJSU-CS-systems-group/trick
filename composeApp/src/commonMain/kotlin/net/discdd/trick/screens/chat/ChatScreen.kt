@@ -48,19 +48,18 @@ import org.koin.core.parameter.parametersOf
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun ChatScreen(
-    contactId: String,
+    shortId: String,
     messages: List<Message>,
     isContactConnected: Boolean,
     onSend: (String) -> Unit,
     onSendPicture: (ByteArray, String?, String?) -> Unit,
     onBack: () -> Unit,
     onPickImage: (() -> Unit)? = null,
-    viewModel: ChatViewModel = koinViewModel(parameters = { parametersOf(contactId) })
+    viewModel: ChatViewModel = koinViewModel(parameters = { parametersOf(shortId) })
 ) {
     val contact by viewModel.contact.collectAsState()
     val title = contact?.displayName?.takeIf { it.isNotBlank() }
-        ?: contact?.shortId
-        ?: contactId.ifBlank { "Unknown" }.takeIf { it != "Unknown" }
+        ?: shortId.ifBlank { "Unknown" }.takeIf { it != "Unknown" }
         ?: "Unknown"
 
     var text by remember { mutableStateOf("") }

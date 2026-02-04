@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.rememberNavController
+import net.discdd.trick.contacts.ContactsPermissionGate
 import net.discdd.trick.navigation.TrickNavHost
 import net.discdd.trick.screens.UnsupportedDeviceScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
@@ -35,38 +36,41 @@ fun AndroidApp(
                 return@Surface
             }
 
-            val navController = rememberNavController()
-            val context = LocalContext.current
+            // Gate the app behind contacts permissions
+            ContactsPermissionGate {
+                val navController = rememberNavController()
+                val context = LocalContext.current
 
-            var imagePickedCallback by remember { mutableStateOf<((ByteArray, String, String) -> Unit)?>(null) }
-            val imagePickerLauncher = rememberImagePickerLauncher { imageResult ->
-                imagePickedCallback?.invoke(
-                    imageResult.data,
-                    imageResult.filename,
-                    imageResult.mimeType
-                )
-            }
-
-            TrickNavHost(
-                navController = navController,
-                wifiAwareService = wifiAwareService,
-                permissionsGranted = permissionsGranted,
-                onPickImage = { callback ->
-                    imagePickedCallback = callback
-                    imagePickerLauncher.launch(
-                        PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
-                },
-                keyExchangeContent = { deviceId, onNavigateBack ->
-                    AndroidKeyExchangeScreen(
-                        context = context,
-                        deviceId = deviceId,
-                        onNavigateBack = onNavigateBack
+                var imagePickedCallback by remember { mutableStateOf<((ByteArray, String, String) -> Unit)?>(null) }
+                val imagePickerLauncher = rememberImagePickerLauncher { imageResult ->
+                    imagePickedCallback?.invoke(
+                        imageResult.data,
+                        imageResult.filename,
+                        imageResult.mimeType
                     )
                 }
-            )
+
+                TrickNavHost(
+                    navController = navController,
+                    wifiAwareService = wifiAwareService,
+                    permissionsGranted = permissionsGranted,
+                    onPickImage = { callback ->
+                        imagePickedCallback = callback
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    keyExchangeContent = { deviceId, onNavigateBack ->
+                        AndroidKeyExchangeScreen(
+                            context = context,
+                            deviceId = deviceId,
+                            onNavigateBack = onNavigateBack
+                        )
+                    }
+                )
+            }
         }
     }
 }
