@@ -5,6 +5,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.discdd.trick.libsignal.LibSignalManager
 import net.discdd.trick.libsignal.PublicKey
+import net.discdd.trick.signal.PreKeyBundleData
+import net.discdd.trick.signal.PreKeyBundleResolver
+import net.discdd.trick.signal.SignalError
+import net.discdd.trick.signal.SignalSessionManager
 import net.discdd.trick.util.ShortIdGenerator
 
 /**
@@ -185,3 +189,183 @@ fun String.hexToByteArray(): ByteArray {
         .map { it.toInt(16).toByte() }
         .toByteArray()
 }
+
+// ============================================================
+// SIGNAL PROTOCOL KEY EXCHANGE (New)
+// ============================================================
+
+/**
+ * Result of Signal-based QR generation.
+ */
+data class SignalKeyExchangeQRResult(
+    val payloadJson: String,
+    val shortId: String,
+    val bundleUploaded: Boolean
+)
+
+/**
+ * Result of processing a scanned QR code for Signal protocol.
+ */
+sealed class SignalScanResult {
+    data class Success(
+        val shortId: String,
+        val identityKey: ByteArray
+    ) : SignalScanResult()
+
+    data class BundleFetchFailed(
+        val shortId: String,
+        val message: String
+    ) : SignalScanResult()
+
+    data class SessionBuildFailed(
+        val shortId: String,
+        val message: String
+    ) : SignalScanResult()
+
+    data class IdentityChanged(
+        val shortId: String,
+        val newIdentityKey: ByteArray
+    ) : SignalScanResult()
+}
+
+/**
+ * Signal Protocol Key Exchange utilities.
+ *
+ * All new messaging uses Signal protocol exclusively.
+ * - No HPKE fallback: If bundle fetch fails, show error - do NOT create contact
+ * - shortId is opaque and independent of identity key
+ */
+object SignalKeyExchange {
+
+    /**
+     * Generate QR payload with Signal prekey bundle upload.
+     * shortId is obtained from SignalSessionManager (opaque, independent of keys).
+     *
+     * @param signalSessionManager Initialized SignalSessionManager
+     * @param preKeyBundleResolver Resolver for uploading bundle to trcky.org
+     * @param deviceId Device identifier for the QR payload
+     * @return SignalKeyExchangeQRResult with payload JSON, shortId, and upload status
+     */
+    suspend fun generateQRPayloadWithBundle(
+        signalSessionManager: SignalSessionManager,
+        preKeyBundleResolver: PreKeyBundleResolver?,
+        deviceId: String
+    ): SignalKeyExchangeQRResult {
+        // 1. Ensure initialized (loads/creates identity and shortId)
+        signalSessionManager.initialize()
+
+        // 2. Replenish prekeys if needed
+        signalSessionManager.replenishPreKeysIfNeeded()
+
+        // 3. Get our shortId (opaque, independent of identity)
+        val shortId = signalSessionManager.getShortId()
+
+        // 4. Generate and upload prekey bundle
+        var uploadSuccess = false
+        preKeyBundleResolver?.let { resolver ->
+            val bundle = signalSessionManager.generatePreKeyBundle()
+            uploadSuccess = resolver.uploadBundle(shortId, bundle)
+        }
+
+        // 5. Generate QR payload (identity for verification, shortId for bundle lookup)
+        val identityKeyHex = signalSessionManager.getIdentityPublicKey().toHexString()
+        val timestamp = currentTimeMillis()
+        val registrationId = signalSessionManager.getLocalRegistrationId()
+
+        val payload = SignalKeyExchangePayload(
+            version = "signal-v1",
+            deviceId = deviceId,
+            shortId = shortId,
+            identityKeyHex = identityKeyHex,
+            registrationId = registrationId,
+            timestamp = timestamp
+        )
+
+        val payloadJson = Json.encodeToString(payload)
+        return SignalKeyExchangeQRResult(
+            payloadJson = payloadJson,
+            shortId = shortId,
+            bundleUploaded = uploadSuccess
+        )
+    }
+
+    /**
+     * Process scanned QR/shortId.
+     * Fetches bundle and builds session - NO fallback to legacy.
+     *
+     * @param shortId The shortId from the scanned QR or URL
+     * @param signalSessionManager Initialized SignalSessionManager
+     * @param preKeyBundleResolver Resolver for fetching bundle from trcky.org
+     * @return SignalScanResult indicating success or specific error
+     */
+    suspend fun processScannedShortId(
+        shortId: String,
+        signalSessionManager: SignalSessionManager,
+        preKeyBundleResolver: PreKeyBundleResolver
+    ): SignalScanResult {
+        // 1. Fetch bundle (throws BundleFetchFailed if not found)
+        val bundle: PreKeyBundleData
+        try {
+            bundle = preKeyBundleResolver.fetchBundleByShortId(shortId)
+        } catch (e: SignalError.BundleFetchFailed) {
+            // NO FALLBACK - return error
+            return SignalScanResult.BundleFetchFailed(shortId, e.cause)
+        }
+
+        // 2. Build Signal session (libsignal validates bundle internally)
+        try {
+            signalSessionManager.buildSessionFromPreKeyBundle(
+                peerId = shortId,
+                deviceId = bundle.deviceId,
+                bundle = bundle
+            )
+        } catch (e: SignalError.UntrustedIdentity) {
+            // Identity changed - requires user confirmation
+            return SignalScanResult.IdentityChanged(shortId, e.newKey)
+        } catch (e: SignalError.SessionBuildFailed) {
+            // Invalid bundle (libsignal rejected it)
+            return SignalScanResult.SessionBuildFailed(shortId, e.cause)
+        }
+
+        // 3. Replenish our prekeys (we may have been scanned too)
+        signalSessionManager.replenishPreKeysIfNeeded()
+
+        // 4. Return success with peer's identity key
+        return SignalScanResult.Success(shortId, bundle.identityKey)
+    }
+
+    /**
+     * Confirm identity change and rebuild session.
+     *
+     * @param shortId The peer's shortId
+     * @param newIdentityKey The new identity key to accept
+     * @param signalSessionManager Initialized SignalSessionManager
+     * @param preKeyBundleResolver Resolver for fetching fresh bundle
+     * @return SignalScanResult indicating success or error
+     */
+    suspend fun confirmIdentityChangeAndRebuild(
+        shortId: String,
+        newIdentityKey: ByteArray,
+        signalSessionManager: SignalSessionManager,
+        preKeyBundleResolver: PreKeyBundleResolver
+    ): SignalScanResult {
+        // Confirm the identity change
+        signalSessionManager.confirmIdentityChange(shortId, 1, newIdentityKey)
+
+        // Fetch fresh bundle and rebuild session
+        return processScannedShortId(shortId, signalSessionManager, preKeyBundleResolver)
+    }
+}
+
+/**
+ * Signal protocol key exchange payload.
+ */
+@Serializable
+data class SignalKeyExchangePayload(
+    val version: String,
+    val deviceId: String,
+    val shortId: String,
+    val identityKeyHex: String,
+    val registrationId: Int,
+    val timestamp: Long
+)
