@@ -200,15 +200,15 @@ fun AndroidKeyExchangeScreen(
                 showScanner = true
             },
             onUntrust = { peerId ->
-                // Remove from KeyManager
-                keyManager.removePeerPublicKey(peerId)
-
-                // Get shortId for the peer and unlink from native contacts
+                // Get shortId for the peer and unlink from native contacts BEFORE removing from KeyManager
                 val peerPublicKey = keyManager.getPeerPublicKey(peerId)
                 if (peerPublicKey != null) {
                     val peerShortId = ShortIdGenerator.generateShortId(peerPublicKey)
                     nativeContactsManager.unlinkTrickData(peerShortId)
                 }
+
+                // Remove from KeyManager after we've retrieved the data we need
+                keyManager.removePeerPublicKey(peerId)
 
                 trustedPeers = keyManager.getTrustedPeerIds()
                 Toast.makeText(localContext, "Removed trust for $peerId", Toast.LENGTH_SHORT).show()

@@ -1,6 +1,6 @@
 package net.discdd.trick.navigation
 
-import java.net.URLEncoder
+import net.discdd.trick.util.urlEncode
 
 /**
  * Sealed class defining app screen routes for NavHost.
@@ -15,7 +15,7 @@ sealed class Screen(val route: String) {
          * @param peerId The peer ID for WiFi Aware operations (deviceId when available, otherwise shortId)
          */
         fun createRoute(shortId: String, peerId: String): String {
-            val encodedPeerId = URLEncoder.encode(peerId, "UTF-8")
+            val encodedPeerId = urlEncode(peerId, "UTF-8")
             return "chat/$shortId/$encodedPeerId"
         }
     }

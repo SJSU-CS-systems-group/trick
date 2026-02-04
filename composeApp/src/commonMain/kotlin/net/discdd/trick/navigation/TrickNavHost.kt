@@ -214,7 +214,7 @@ fun TrickNavHost(
         ) { backStackEntry ->
             val shortId = backStackEntry.arguments?.getString("shortId") ?: ""
             // peerId is used for WiFi Aware operations (deviceId when available, otherwise shortId)
-            val peerId = java.net.URLDecoder.decode(
+            val peerId = net.discdd.trick.util.urlDecode(
                 backStackEntry.arguments?.getString("peerId") ?: shortId,
                 "UTF-8"
             )
