@@ -85,7 +85,8 @@ actual class NativeContactsManager(
             }
         }
 
-        return contacts
+        // Deduplicate by shortId (same peer could be linked to multiple contacts)
+        return contacts.distinctBy { it.shortId }
     }
 
     actual fun observeTrickContacts(): Flow<List<TrickContact>> {
@@ -132,7 +133,11 @@ actual class NativeContactsManager(
         }
 
         return try {
-            // First check if this contact already has Trick data
+            // Remove any existing link with this shortId (prevents duplicates)
+            // This allows "moving" a peer to a different contact
+            unlinkTrickData(shortId)
+
+            // Check if this contact already has Trick data (for a different peer)
             val existingDataId = findTrickDataId(nativeContactId)
 
             if (existingDataId != null) {
