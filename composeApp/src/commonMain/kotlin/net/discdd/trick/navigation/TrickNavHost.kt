@@ -86,6 +86,7 @@ fun TrickNavHost(
                 val textContent = chatMessage.text_content
                 if (textContent != null) {
                     val msg = textContent.text
+                    val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
                     debugLogs.add(
                         "[App] Message received${if (wasEncrypted) " (encrypted)" else ""}: $msg"
                     )
@@ -94,7 +95,7 @@ fun TrickNavHost(
                         Message(
                             content = msg,
                             isSent = false,
-                            isServiceMessage = msg.startsWith("Service discovered:"),
+                            isServiceMessage = isSystemMessage,
                             isEncrypted = wasEncrypted,
                             peerId = effectivePeerId
                         )
@@ -144,13 +145,14 @@ fun TrickNavHost(
             val textContent = chatMessage.text_content
             if (textContent != null) {
                 val msg = textContent.text
+                val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
                 debugLogs.add("[App] Message received${if (wasEncrypted) " (encrypted)" else ""} (refresh): $msg")
                 println("[App] Message received (refresh): $msg")
                 messages.add(
                     Message(
                         content = msg,
                         isSent = false,
-                        isServiceMessage = msg.startsWith("Service discovered:"),
+                        isServiceMessage = isSystemMessage,
                         isEncrypted = wasEncrypted,
                         peerId = effectivePeerId
                     )

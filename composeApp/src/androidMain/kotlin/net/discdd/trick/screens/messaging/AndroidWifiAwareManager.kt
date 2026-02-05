@@ -523,7 +523,7 @@ class AndroidWifiAwareManager(
             )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
-                    "[System] Connected to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    "You're now connected to ${DeviceIdentity.getShortId(remoteDeviceId)}!",
                     remoteDeviceId
             )
 
@@ -717,7 +717,7 @@ class AndroidWifiAwareManager(
             )
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
-                    "[System] Connected to ${DeviceIdentity.getShortId(remoteDeviceId)}",
+                    "You're now connected to ${DeviceIdentity.getShortId(remoteDeviceId)}!",
                     remoteDeviceId
             )
 
@@ -1106,7 +1106,7 @@ class AndroidWifiAwareManager(
         }
 
         notifyConnectionStatus(peerId, ConnectionState.DISCONNECTED)
-        notifyMessage("[System] Connection lost to ${DeviceIdentity.getShortId(peerId)}", peerId)
+        notifyMessage("Connection lost to ${DeviceIdentity.getShortId(peerId)}", peerId)
 
         // Attempt reconnection
         scope.launch {
