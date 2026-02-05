@@ -335,6 +335,11 @@ fun MessageBubble(message: Message) {
     val isSystemMessage = message.content.startsWith("[System]")
     val isErrorMessage = message.content.startsWith("[Error]")
 
+    // Suppress error messages from being displayed in the UI
+    if (isErrorMessage) {
+        return
+    }
+
     Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement =
