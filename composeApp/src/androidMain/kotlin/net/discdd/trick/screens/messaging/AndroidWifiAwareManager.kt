@@ -1039,12 +1039,16 @@ class AndroidWifiAwareManager(
                         decryptedBytes[0] == CONTENT_TYPE_TEXT.toByte() -> {
                             val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
                             val textContent = TextContent.ADAPTER.decode(payload.toByteString())
-                            chatMessage.copy(text_content = textContent, encrypted_content = null)
+                            val decryptedTextMsg = chatMessage.copy(text_content = textContent, encrypted_content = null)
+                            Log.d(TAG, "[DEBUG] Decrypted text - original encryption_version: ${chatMessage.encryption_version}, result encryption_version: ${decryptedTextMsg.encryption_version}")
+                            decryptedTextMsg
                         }
                         decryptedBytes[0] == CONTENT_TYPE_PHOTO.toByte() -> {
                             val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
                             val photoContent = PhotoContent.ADAPTER.decode(payload.toByteString())
-                            chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                            val decryptedPhotoMsg = chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                            Log.d(TAG, "[DEBUG] Decrypted photo - original encryption_version: ${chatMessage.encryption_version}, result encryption_version: ${decryptedPhotoMsg.encryption_version}")
+                            decryptedPhotoMsg
                         }
                         else -> {
                             Log.e(TAG, "Unknown content type: ${decryptedBytes[0]}")

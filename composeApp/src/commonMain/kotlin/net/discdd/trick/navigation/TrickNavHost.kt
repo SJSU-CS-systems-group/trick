@@ -81,6 +81,7 @@ fun TrickNavHost(
             debugLogs.add("[UI] Starting discovery...")
             wifiAwareService.startDiscovery { chatMessage, peerId ->
                 val wasEncrypted = chatMessage.encryption_version != null
+                println("[DEBUG] Received message - encryption_version: ${chatMessage.encryption_version}, wasEncrypted: $wasEncrypted")
                 val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
                 val textContent = chatMessage.text_content
                 if (textContent != null) {
@@ -138,17 +139,19 @@ fun TrickNavHost(
         debugLogs.add("[UI] Discovery stopped. Restarting...")
         discoveryStatus.value = "Restarting..."
         wifiAwareService.startDiscovery { chatMessage, peerId ->
+            val wasEncrypted = chatMessage.encryption_version != null
             val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
             val textContent = chatMessage.text_content
             if (textContent != null) {
                 val msg = textContent.text
-                debugLogs.add("[App] Message received (refresh): $msg")
+                debugLogs.add("[App] Message received${if (wasEncrypted) " (encrypted)" else ""} (refresh): $msg")
                 println("[App] Message received (refresh): $msg")
                 messages.add(
                     Message(
                         content = msg,
                         isSent = false,
                         isServiceMessage = msg.startsWith("Service discovered:"),
+                        isEncrypted = wasEncrypted,
                         peerId = effectivePeerId
                     )
                 )
@@ -158,7 +161,7 @@ fun TrickNavHost(
             if (photoContent != null) {
                 val imageData = photoContent.data_.toByteArray()
                 val filename = photoContent.filename ?: "image"
-                debugLogs.add("[App] Image received (refresh): $filename (${imageData.size} bytes)")
+                debugLogs.add("[App] Image received${if (wasEncrypted) " (encrypted)" else ""} (refresh): $filename (${imageData.size} bytes)")
                 println("[App] Image received (refresh): $filename")
                 messages.add(
                     Message(
@@ -168,6 +171,7 @@ fun TrickNavHost(
                         type = MessageType.IMAGE,
                         imageData = imageData,
                         filename = filename,
+                        isEncrypted = wasEncrypted,
                         peerId = effectivePeerId
                     )
                 )
@@ -234,6 +238,7 @@ fun TrickNavHost(
                                 type = MessageType.IMAGE,
                                 imageData = data,
                                 filename = filename,
+                                isEncrypted = true,
                                 peerId = peerId
                             )
                         )
@@ -256,6 +261,7 @@ fun TrickNavHost(
                             isSent = true,
                             isServiceMessage = false,
                             type = MessageType.TEXT,
+                            isEncrypted = true,
                             peerId = peerId
                         )
                     )
@@ -273,6 +279,7 @@ fun TrickNavHost(
                             type = MessageType.IMAGE,
                             imageData = imageData,
                             filename = filename,
+                            isEncrypted = true,
                             peerId = peerId
                         )
                     )
