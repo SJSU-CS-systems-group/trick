@@ -12,9 +12,6 @@ import androidx.core.content.ContextCompat
 import net.discdd.trick.messaging.ChatMessage
 import net.discdd.trick.messaging.PhotoContent
 import net.discdd.trick.messaging.TextContent
-import net.discdd.trick.security.KeyManager
-import net.discdd.trick.libsignal.LibSignalManager
-import net.discdd.trick.libsignal.createLibSignalManager
 import net.discdd.trick.signal.SignalError
 import net.discdd.trick.signal.SignalSessionManager
 import java.io.DataInputStream
@@ -39,7 +36,7 @@ import okio.ByteString.Companion.toByteString
  */
 class AndroidWifiAwareManager(
     private val context: Context,
-    private val signalSessionManager: SignalSessionManager? = null
+    private val signalSessionManager: SignalSessionManager
 ) {
     private val TAG = "WifiAware"
 
@@ -56,10 +53,6 @@ class AndroidWifiAwareManager(
 
     // Device identity
     private val localDeviceId: String by lazy { DeviceIdentity.generateDeviceId(context) }
-
-    // Legacy encryption components (kept for legacy HPKE decryption of local history only)
-    private val keyManager = KeyManager(context)
-    private val libSignalManager: LibSignalManager = createLibSignalManager()
 
     // Connection management
     private val connectionPool = ConnectionPool()
@@ -844,59 +837,26 @@ class AndroidWifiAwareManager(
                 // Create text content
                 val textContent = TextContent(text = message)
 
-                // SIGNAL-ONLY: Use Signal protocol for encryption
-                val chatMessage = if (signalSessionManager != null && signalSessionManager.hasSession(peerId)) {
-                    // Encrypt with Signal protocol
-                    val contentBytes = byteArrayOf(CONTENT_TYPE_TEXT.toByte()) + textContent.encode()
-                    val result = signalSessionManager.encryptMessage(peerId, 1, contentBytes)
-
-                    ChatMessage(
-                        message_id = UUID.randomUUID().toString(),
-                        timestamp = System.currentTimeMillis(),
-                        sender_id = localDeviceId,
-                        encrypted_content = result.ciphertext.toByteString(),
-                        encryption_version = "signal-v1",
-                        message_type = result.messageType,
-                        registration_id = signalSessionManager.getLocalRegistrationId(),
-                        sender_device_id = 1
-                    )
-                } else if (signalSessionManager != null) {
-                    // No Signal session - show error
+                // Signal-only encryption - require established session
+                if (!signalSessionManager.hasSession(peerId)) {
                     Log.e(TAG, "No Signal session for $peerId")
                     withContext(Dispatchers.Main) {
                         notifyMessage("[Error] Secure session not established. Exchange QR codes first.", peerId)
                     }
                     return@launch
-                } else {
-                    // Legacy fallback when SignalSessionManager not available
-                    // Check if peer is trusted (key exchange completed)
-                    val peerPublicKey = keyManager.getPeerPublicKey(peerId)
-
-                    if (peerPublicKey != null) {
-                        // ENCRYPT: Prepend type discriminator, then encrypt with peer's public key
-                        val contentBytes = byteArrayOf(CONTENT_TYPE_TEXT.toByte()) + textContent.encode()
-                        val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
-                        val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
-
-                        ChatMessage(
-                            message_id = UUID.randomUUID().toString(),
-                            timestamp = System.currentTimeMillis(),
-                            sender_id = localDeviceId,
-                            encrypted_content = encryptedBytes.toByteString(),
-                            encryption_version = "hpke-v1",
-                            sender_public_key = myPublicKey?.data?.toByteString()
-                        )
-                    } else {
-                        // PLAINTEXT FALLBACK: Peer not trusted, send unencrypted
-                        Log.w(TAG, "Peer $peerId not trusted, sending plaintext")
-                        ChatMessage(
-                            message_id = UUID.randomUUID().toString(),
-                            timestamp = System.currentTimeMillis(),
-                            sender_id = localDeviceId,
-                            text_content = textContent
-                        )
-                    }
                 }
+
+                // Encrypt with Signal protocol
+                val contentBytes = byteArrayOf(CONTENT_TYPE_TEXT.toByte()) + textContent.encode()
+                val result = signalSessionManager.encryptMessage(peerId, 1, contentBytes)
+
+                val chatMessage = ChatMessage(
+                    message_id = UUID.randomUUID().toString(),
+                    timestamp = System.currentTimeMillis(),
+                    sender_id = localDeviceId,
+                    encrypted_content = result.ciphertext.toByteString(),
+                    encryption_version = "signal-v1"
+                )
 
                 // Serialize to bytes
                 val messageBytes = chatMessage.encode()
@@ -908,8 +868,7 @@ class AndroidWifiAwareManager(
 
                 connection.updateLastMessageTime()
 
-                val encryptionType = chatMessage.encryption_version ?: "plaintext"
-                Log.d(TAG, "Message sent to ${DeviceIdentity.getShortId(peerId)} ($encryptionType): $message")
+                Log.d(TAG, "Message sent to ${DeviceIdentity.getShortId(peerId)} (signal-v1): $message")
             } catch (e: SignalError.NoSession) {
                 Log.e(TAG, "No Signal session for $peerId")
                 withContext(Dispatchers.Main) {
@@ -982,66 +941,33 @@ class AndroidWifiAwareManager(
                     mime_type = mimeType
                 )
 
-                // SIGNAL-ONLY: Use Signal protocol for encryption
-                val chatMessage = if (signalSessionManager != null && signalSessionManager.hasSession(peerId)) {
-                    // Encrypt with Signal protocol
-                    val contentBytes = byteArrayOf(CONTENT_TYPE_PHOTO.toByte()) + photoContent.encode()
-                    val result = signalSessionManager.encryptMessage(peerId, 1, contentBytes)
-
-                    ChatMessage(
-                        message_id = UUID.randomUUID().toString(),
-                        timestamp = System.currentTimeMillis(),
-                        sender_id = localDeviceId,
-                        encrypted_content = result.ciphertext.toByteString(),
-                        encryption_version = "signal-v1",
-                        message_type = result.messageType,
-                        registration_id = signalSessionManager.getLocalRegistrationId(),
-                        sender_device_id = 1
-                    )
-                } else if (signalSessionManager != null) {
-                    // No Signal session - show error
+                // Signal-only encryption - require established session
+                if (!signalSessionManager.hasSession(peerId)) {
                     Log.e(TAG, "No Signal session for $peerId")
                     withContext(Dispatchers.Main) {
                         notifyMessage("[Error] Secure session not established. Exchange QR codes first.", peerId)
                     }
                     return@launch
-                } else {
-                    // Legacy fallback when SignalSessionManager not available
-                    val peerPublicKey = keyManager.getPeerPublicKey(peerId)
-
-                    if (peerPublicKey != null) {
-                        // ENCRYPT: Prepend type discriminator, then encrypt with peer's public key
-                        val contentBytes = byteArrayOf(CONTENT_TYPE_PHOTO.toByte()) + photoContent.encode()
-                        val encryptedBytes = libSignalManager.encrypt(peerPublicKey, contentBytes)
-                        val myPublicKey = keyManager.getIdentityKeyPair()?.publicKey
-
-                        ChatMessage(
-                            message_id = UUID.randomUUID().toString(),
-                            timestamp = System.currentTimeMillis(),
-                            sender_id = localDeviceId,
-                            encrypted_content = encryptedBytes.toByteString(),
-                            encryption_version = "hpke-v1",
-                            sender_public_key = myPublicKey?.data?.toByteString()
-                        )
-                    } else {
-                        // PLAINTEXT FALLBACK: Peer not trusted, send unencrypted
-                        Log.w(TAG, "Peer $peerId not trusted, sending plaintext image")
-                        ChatMessage(
-                            message_id = UUID.randomUUID().toString(),
-                            timestamp = System.currentTimeMillis(),
-                            sender_id = localDeviceId,
-                            photo_content = photoContent
-                        )
-                    }
                 }
+
+                // Encrypt with Signal protocol
+                val contentBytes = byteArrayOf(CONTENT_TYPE_PHOTO.toByte()) + photoContent.encode()
+                val result = signalSessionManager.encryptMessage(peerId, 1, contentBytes)
+
+                val chatMessage = ChatMessage(
+                    message_id = UUID.randomUUID().toString(),
+                    timestamp = System.currentTimeMillis(),
+                    sender_id = localDeviceId,
+                    encrypted_content = result.ciphertext.toByteString(),
+                    encryption_version = "signal-v1"
+                )
 
                 // Serialize to bytes
                 val messageBytes = chatMessage.encode()
 
-                val encryptionType = chatMessage.encryption_version ?: "plaintext"
                 Log.d(
                         TAG,
-                        "Sending picture to ${DeviceIdentity.getShortId(peerId)} ($encryptionType): ${messageBytes.size} bytes"
+                        "Sending picture to ${DeviceIdentity.getShortId(peerId)} (signal-v1): ${messageBytes.size} bytes"
                 )
 
                 // Send with length-prefixed framing
@@ -1093,54 +1019,51 @@ class AndroidWifiAwareManager(
 
             // SIGNAL-V1: Normal path for new Signal protocol
             chatMessage.encryption_version == "signal-v1" -> {
-                if (signalSessionManager == null) {
-                    Log.e(TAG, "Cannot decrypt signal-v1: SignalSessionManager not available")
-                    chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Signal not initialized]"))
-                } else {
-                    try {
-                        val deviceId = chatMessage.sender_device_id ?: 1
-                        val result = signalSessionManager.decryptMessage(
-                            senderId = peerId,
-                            deviceId = deviceId,
-                            ciphertext = chatMessage.encrypted_content.toByteArray()
-                        )
+                try {
+                    val encryptedContent = chatMessage.encrypted_content
+                        ?: return chatMessage.copy(text_content = TextContent(text = "[Decryption failed: No encrypted content]"))
 
-                        // Decode decrypted content by type discriminator
-                        val decryptedBytes = result.plaintext
-                        when {
-                            decryptedBytes.isEmpty() -> {
-                                Log.e(TAG, "Decrypted content is empty")
-                                chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Invalid content]"))
-                            }
-                            decryptedBytes[0] == CONTENT_TYPE_TEXT.toByte() -> {
-                                val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
-                                val textContent = TextContent.ADAPTER.decode(payload.toByteString())
-                                chatMessage.copy(text_content = textContent, encrypted_content = null)
-                            }
-                            decryptedBytes[0] == CONTENT_TYPE_PHOTO.toByte() -> {
-                                val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
-                                val photoContent = PhotoContent.ADAPTER.decode(payload.toByteString())
-                                chatMessage.copy(photo_content = photoContent, encrypted_content = null)
-                            }
-                            else -> {
-                                Log.e(TAG, "Unknown content type: ${decryptedBytes[0]}")
-                                chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Unknown content type]"))
-                            }
+                    val result = signalSessionManager.decryptMessage(
+                        senderId = peerId,
+                        deviceId = 1, // Default device ID
+                        ciphertext = encryptedContent.toByteArray()
+                    )
+
+                    // Decode decrypted content by type discriminator
+                    val decryptedBytes = result.plaintext
+                    when {
+                        decryptedBytes.isEmpty() -> {
+                            Log.e(TAG, "Decrypted content is empty")
+                            chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Invalid content]"))
                         }
-                    } catch (e: SignalError.UntrustedIdentity) {
-                        Log.e(TAG, "Identity changed for $peerId")
-                        // TODO: Show identity changed warning UI
-                        chatMessage.copy(text_content = TextContent(text = "[Security: Identity changed - verify contact]"))
-                    } catch (e: SignalError.InvalidMessage) {
-                        Log.e(TAG, "Signal decryption failed: ${e.reason}")
-                        chatMessage.copy(text_content = TextContent(text = "[Decryption failed]"))
-                    } catch (e: SignalError.NoSession) {
-                        Log.e(TAG, "No Signal session for $peerId")
-                        chatMessage.copy(text_content = TextContent(text = "[No secure session]"))
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Signal decryption error: ${e.message}")
-                        chatMessage.copy(text_content = TextContent(text = "[Decryption failed: ${e.message}]"))
+                        decryptedBytes[0] == CONTENT_TYPE_TEXT.toByte() -> {
+                            val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
+                            val textContent = TextContent.ADAPTER.decode(payload.toByteString())
+                            chatMessage.copy(text_content = textContent, encrypted_content = null)
+                        }
+                        decryptedBytes[0] == CONTENT_TYPE_PHOTO.toByte() -> {
+                            val payload = decryptedBytes.copyOfRange(1, decryptedBytes.size)
+                            val photoContent = PhotoContent.ADAPTER.decode(payload.toByteString())
+                            chatMessage.copy(photo_content = photoContent, encrypted_content = null)
+                        }
+                        else -> {
+                            Log.e(TAG, "Unknown content type: ${decryptedBytes[0]}")
+                            chatMessage.copy(text_content = TextContent(text = "[Decryption failed: Unknown content type]"))
+                        }
                     }
+                } catch (e: SignalError.UntrustedIdentity) {
+                    Log.e(TAG, "Identity changed for $peerId")
+                    // TODO: Show identity changed warning UI
+                    chatMessage.copy(text_content = TextContent(text = "[Security: Identity changed - verify contact]"))
+                } catch (e: SignalError.InvalidMessage) {
+                    Log.e(TAG, "Signal decryption failed: ${e.reason}")
+                    chatMessage.copy(text_content = TextContent(text = "[Decryption failed]"))
+                } catch (e: SignalError.NoSession) {
+                    Log.e(TAG, "No Signal session for $peerId")
+                    chatMessage.copy(text_content = TextContent(text = "[No secure session]"))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Signal decryption error: ${e.message}")
+                    chatMessage.copy(text_content = TextContent(text = "[Decryption failed: ${e.message}]"))
                 }
             }
 

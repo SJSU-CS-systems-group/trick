@@ -142,6 +142,15 @@ CREATE TABLE SignalSignedPreKey (
     created_at INTEGER NOT NULL
 );
 
+-- Kyber post-quantum prekeys
+-- Used by KyberPreKeyStore / PQ X3DH
+CREATE TABLE SignalKyberPreKey (
+    kyber_prekey_id INTEGER NOT NULL PRIMARY KEY,
+    kyber_prekey_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER
+);
+
 -- ============================================================
 -- SIGNAL IDENTITY QUERIES (singleton)
 -- ============================================================
@@ -218,7 +227,7 @@ countPreKeys:
 SELECT COUNT(*) FROM SignalPreKey;
 
 selectMaxPreKeyId:
-SELECT MAX(prekey_id) FROM SignalPreKey;
+SELECT MAX(prekey_id) AS max_prekey_id FROM SignalPreKey;
 
 -- ============================================================
 -- SIGNAL SIGNED PREKEY QUERIES
@@ -241,3 +250,31 @@ SELECT * FROM SignalSignedPreKey ORDER BY created_at DESC;
 
 selectLatestSignedPreKeyId:
 SELECT signed_prekey_id FROM SignalSignedPreKey ORDER BY created_at DESC LIMIT 1;
+
+-- ============================================================
+-- SIGNAL KYBER PREKEY QUERIES
+-- ============================================================
+
+selectKyberPreKey:
+SELECT kyber_prekey_record FROM SignalKyberPreKey WHERE kyber_prekey_id = ?;
+
+containsKyberPreKey:
+SELECT COUNT(*) FROM SignalKyberPreKey WHERE kyber_prekey_id = ?;
+
+insertKyberPreKey:
+INSERT OR REPLACE INTO SignalKyberPreKey(kyber_prekey_id, kyber_prekey_record, created_at, used_at)
+VALUES (?, ?, ?, ?);
+
+markKyberPreKeyUsed:
+UPDATE SignalKyberPreKey
+SET used_at = ?
+WHERE kyber_prekey_id = ?;
+
+countKyberPreKeys:
+SELECT COUNT(*) FROM SignalKyberPreKey;
+
+selectMaxKyberPreKeyId:
+SELECT MAX(kyber_prekey_id) AS max_kyber_prekey_id FROM SignalKyberPreKey;
+
+selectAllKyberPreKeys:
+SELECT kyber_prekey_record FROM SignalKyberPreKey WHERE used_at IS NULL ORDER BY created_at DESC;

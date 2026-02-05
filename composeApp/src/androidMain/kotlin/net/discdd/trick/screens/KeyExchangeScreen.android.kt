@@ -28,7 +28,13 @@ actual fun QRCodeView(payload: String) {
 
     LaunchedEffect(payload) {
         scope.launch {
-            qrBitmap = generateQRCode(payload, 512, 512)
+            // ZXing throws IllegalArgumentException on empty contents, so skip generation
+            qrBitmap = if (payload.isBlank()) {
+                null
+            } else {
+                // Use larger size for dense QR codes (Signal bundles with Kyber keys)
+                generateQRCode(payload, 1024, 1024)
+            }
         }
     }
 
@@ -52,10 +58,19 @@ actual fun QRCodeView(payload: String) {
  * @return Bitmap containing the QR code
  */
 private suspend fun generateQRCode(content: String, width: Int, height: Int): Bitmap = withContext(Dispatchers.Default) {
+    // Extra safety: never pass empty/blank content to ZXing
+    if (content.isBlank()) {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+        bitmap.eraseColor(Color.WHITE)
+        return@withContext bitmap
+    }
+
     val hints = hashMapOf<EncodeHintType, Any>().apply {
+        // Use M (Medium) error correction - raw bytes are ~2000, well under M's 2,331 limit
         put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M)
-        put(EncodeHintType.CHARACTER_SET, "UTF-8")
         put(EncodeHintType.MARGIN, 1)
+        // Force byte mode with ISO-8859-1 for raw protobuf bytes
+        put(EncodeHintType.CHARACTER_SET, "ISO-8859-1")
     }
 
     val writer = QRCodeWriter()

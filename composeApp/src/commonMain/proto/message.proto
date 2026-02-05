@@ -49,3 +49,36 @@ message ChatMessage {
   optional int32 registration_id = 10;       // Sender's Signal registration ID
   optional int32 sender_device_id = 11;      // Sender's device ID (default 1)
 }
+
+// Key exchange payload for QR code - compact binary format with full Signal bundle
+// This format uses protobuf + Base32 encoding for QR alphanumeric mode compatibility
+// Max size ~1960 bytes raw → ~3136 chars Base32 → fits in QR Version 35-40 (alphanumeric)
+message KeyExchangeBundle {
+  // Identity layer (for signature verification)
+  bytes device_id = 1;          // UUID as 16 bytes
+  bytes public_key = 2;         // Ed25519 public key (32 bytes)
+  int64 timestamp = 3;          // Unix timestamp milliseconds
+  bytes signature = 4;          // Ed25519 signature (64 bytes)
+  string short_id = 5;          // ~6 char hex identifier
+
+  // Signal prekey bundle fields
+  int32 registration_id = 10;
+  int32 signal_device_id = 11;
+
+  // Optional EC one-time prekey
+  optional int32 prekey_id = 12;
+  optional bytes prekey_public = 13;        // EC public key (~33 bytes)
+
+  // Signed prekey (required)
+  int32 signed_prekey_id = 14;
+  bytes signed_prekey_public = 15;          // EC public key (32 bytes)
+  bytes signed_prekey_signature = 16;       // Signature (64 bytes)
+
+  // Identity key
+  bytes identity_key = 17;                  // EC public key (33 bytes)
+
+  // Kyber post-quantum prekey (required for libsignal 0.79+)
+  int32 kyber_prekey_id = 18;
+  bytes kyber_prekey_public = 19;           // Kyber-1024 public key (~1568 bytes)
+  bytes kyber_prekey_signature = 20;        // Signature (64 bytes)
+}

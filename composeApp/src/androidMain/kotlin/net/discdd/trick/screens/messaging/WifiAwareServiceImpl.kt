@@ -2,10 +2,14 @@ package net.discdd.trick.screens.messaging
 
 import android.content.Context
 import android.util.Log
+import net.discdd.trick.signal.SignalSessionManager
 
-class WifiAwareServiceImpl(private val context: Context) : WifiAwareService {
+class WifiAwareServiceImpl(
+    private val context: Context,
+    private val signalSessionManager: SignalSessionManager
+) : WifiAwareService {
     // Connection-based WiFi Aware manager
-    private val manager = AndroidWifiAwareManager(context)
+    private val manager = AndroidWifiAwareManager(context, signalSessionManager)
 
     override fun startDiscovery(onMessageReceived: (net.discdd.trick.messaging.ChatMessage, String?) -> Unit) {
         Log.d("WifiAwareServiceImpl", "Starting discovery with connection-based networking")

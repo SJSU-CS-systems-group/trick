@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.discdd.trick.TrickDatabase
 import net.discdd.trick.signal.stores.SQLDelightIdentityKeyStore
+import net.discdd.trick.signal.stores.SQLDelightKyberPreKeyStore
 import net.discdd.trick.signal.stores.SQLDelightPreKeyStore
 import net.discdd.trick.signal.stores.SQLDelightSessionStore
 import net.discdd.trick.signal.stores.SQLDelightSignedPreKeyStore
@@ -23,15 +24,20 @@ import org.signal.libsignal.protocol.SessionBuilder
 import org.signal.libsignal.protocol.SessionCipher
 import org.signal.libsignal.protocol.SignalProtocolAddress
 import org.signal.libsignal.protocol.UntrustedIdentityException
-import org.signal.libsignal.protocol.ecc.Curve
+import org.signal.libsignal.protocol.ecc.ECKeyPair
+import org.signal.libsignal.protocol.ecc.ECPrivateKey
 import org.signal.libsignal.protocol.ecc.ECPublicKey
-import org.signal.libsignal.protocol.message.CiphertextMessage
 import org.signal.libsignal.protocol.message.PreKeySignalMessage
 import org.signal.libsignal.protocol.message.SignalMessage
 import org.signal.libsignal.protocol.state.PreKeyBundle
+import org.signal.libsignal.protocol.state.KyberPreKeyRecord
+import org.signal.libsignal.protocol.state.KyberPreKeyStore
 import org.signal.libsignal.protocol.state.PreKeyRecord
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import org.signal.libsignal.protocol.util.KeyHelper
+import org.signal.libsignal.protocol.kem.KEMKeyPair
+import org.signal.libsignal.protocol.kem.KEMKeyType
+import org.signal.libsignal.protocol.UsePqRatchet
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -47,8 +53,7 @@ import javax.crypto.spec.GCMParameterSpec
  */
 actual class SignalSessionManager(
     private val context: Context,
-    private val database: TrickDatabase,
-    private val preKeyBundleResolver: PreKeyBundleResolver?
+    private val database: TrickDatabase
 ) {
     private val mutex = Mutex()
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -58,7 +63,7 @@ actual class SignalSessionManager(
     private lateinit var sessionStore: SQLDelightSessionStore
     private lateinit var preKeyStore: SQLDelightPreKeyStore
     private lateinit var signedPreKeyStore: SQLDelightSignedPreKeyStore
-
+    private lateinit var kyberPreKeyStore: SQLDelightKyberPreKeyStore
     // Our identity (loaded from SignalIdentity table)
     private lateinit var identityKeyPair: IdentityKeyPair
     private var registrationId: Int = 0
@@ -71,6 +76,7 @@ actual class SignalSessionManager(
         private const val MASTER_KEY_ALIAS = "signal_identity_master_key"
         private const val INITIAL_PREKEY_COUNT = 100
         private const val INITIAL_SIGNED_PREKEY_ID = 1
+        private const val INITIAL_KYBER_PREKEY_ID = 1
     }
 
     /**
@@ -79,14 +85,14 @@ actual class SignalSessionManager(
      * - Generates new identity, registration ID, and shortId if none exists
      * - Generates initial prekeys if needed
      */
-    actual suspend fun initialize() = withContext(Dispatchers.IO) {
+    actual suspend fun initialize(): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (isInitialized) {
                 Log.d(TAG, "Already initialized")
                 return@withContext
             }
 
-            val existing = database.signalIdentityQueries.selectIdentity().executeAsOneOrNull()
+            val existing = database.trickDatabaseQueries.selectIdentity().executeAsOneOrNull()
 
             if (existing != null) {
                 // Load existing identity
@@ -106,7 +112,7 @@ actual class SignalSessionManager(
                 shortId = generateRandomShortId()
 
                 val (encryptedPrivate, iv) = encryptPrivateKey(identityKeyPair.privateKey.serialize())
-                database.signalIdentityQueries.insertIdentity(
+                database.trickDatabaseQueries.insertIdentity(
                     registration_id = registrationId.toLong(),
                     identity_key_public = identityKeyPair.publicKey.serialize(),
                     identity_key_private_encrypted = encryptedPrivate,
@@ -124,7 +130,7 @@ actual class SignalSessionManager(
             sessionStore = SQLDelightSessionStore(database)
             preKeyStore = SQLDelightPreKeyStore(database)
             signedPreKeyStore = SQLDelightSignedPreKeyStore(database)
-
+            kyberPreKeyStore = SQLDelightKyberPreKeyStore(database)
             isInitialized = true
             Log.d(TAG, "Signal identity initialized - shortId: $shortId, registrationId: $registrationId")
         }
@@ -155,7 +161,7 @@ actual class SignalSessionManager(
         peerId: String,
         deviceId: Int,
         bundle: PreKeyBundleData
-    ) = withContext(Dispatchers.IO) {
+    ): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             checkInitialized()
             val address = SignalProtocolAddress(peerId, deviceId)
@@ -170,35 +176,28 @@ actual class SignalSessionManager(
             }
 
             try {
-                // Construct libsignal PreKeyBundle - let libsignal validate signature
-                val preKeyBundle = if (bundle.preKeyId != null && bundle.preKeyPublic != null) {
-                    PreKeyBundle(
-                        bundle.registrationId,
-                        bundle.deviceId,
-                        bundle.preKeyId,
-                        Curve.decodePoint(bundle.preKeyPublic, 0),
-                        bundle.signedPreKeyId,
-                        Curve.decodePoint(bundle.signedPreKeyPublic, 0),
-                        bundle.signedPreKeySignature,
-                        newIdentityKey
-                    )
-                } else {
-                    // No one-time prekey available
-                    PreKeyBundle(
-                        bundle.registrationId,
-                        bundle.deviceId,
-                        -1,
-                        null,
-                        bundle.signedPreKeyId,
-                        Curve.decodePoint(bundle.signedPreKeyPublic, 0),
-                        bundle.signedPreKeySignature,
-                        newIdentityKey
-                    )
-                }
+                // Kyber keys are required by libsignal 0.79.0+
+                val kyberPreKeyPublic = bundle.kyberPreKeyPublic
+                    ?: throw SignalError.SessionBuildFailed(peerId, "Missing Kyber prekey in bundle")
+                val kyberPreKeySignature = bundle.kyberPreKeySignature
+                    ?: throw SignalError.SessionBuildFailed(peerId, "Missing Kyber signature in bundle")
 
-                // SessionBuilder.process() validates signed prekey signature internally
+                val preKeyBundle = createPreKeyBundle(
+                    registrationId = bundle.registrationId,
+                    deviceId = bundle.deviceId,
+                    preKeyId = bundle.preKeyId ?: 0,
+                    preKeyPublic = bundle.preKeyPublic?.let { ECPublicKey(it) },
+                    signedPreKeyId = bundle.signedPreKeyId,
+                    signedPreKeyPublic = ECPublicKey(bundle.signedPreKeyPublic),
+                    signedPreKeySignature = bundle.signedPreKeySignature,
+                    identityKey = IdentityKey(bundle.identityKey),
+                    kyberPreKeyId = bundle.kyberPreKeyId ?: INITIAL_KYBER_PREKEY_ID,
+                    kyberPreKeyPublic = org.signal.libsignal.protocol.kem.KEMPublicKey(kyberPreKeyPublic),
+                    kyberPreKeySignature = kyberPreKeySignature
+                )
+
                 val sessionBuilder = SessionBuilder(sessionStore, preKeyStore, signedPreKeyStore, identityKeyStore, address)
-                sessionBuilder.process(preKeyBundle)
+                sessionBuilder.process(preKeyBundle, UsePqRatchet.YES)
 
                 // Store peer identity (TOFU - first time)
                 if (existingIdentity == null) {
@@ -233,8 +232,8 @@ actual class SignalSessionManager(
                 throw SignalError.NoSession(peerId)
             }
 
-            val sessionCipher = SessionCipher(sessionStore, preKeyStore, signedPreKeyStore, identityKeyStore, address)
-            val ciphertext = sessionCipher.encrypt(plaintext)
+            val sessionCipher = createSessionCipher(address)
+            val ciphertext = sessionCipher.encrypt(plaintext, java.time.Instant.now())
 
             SignalEncryptResult(
                 ciphertext = ciphertext.serialize(),
@@ -256,7 +255,7 @@ actual class SignalSessionManager(
         mutex.withLock {
             checkInitialized()
             val address = SignalProtocolAddress(senderId, deviceId)
-            val sessionCipher = SessionCipher(sessionStore, preKeyStore, signedPreKeyStore, identityKeyStore, address)
+            val sessionCipher = createSessionCipher(address)
 
             try {
                 // Try to determine message type and decrypt
@@ -264,11 +263,11 @@ actual class SignalSessionManager(
                     // First try as regular SignalMessage
                     val signalMessage = SignalMessage(ciphertext)
                     sessionCipher.decrypt(signalMessage)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Try as PreKeySignalMessage
                     try {
                         val preKeyMessage = PreKeySignalMessage(ciphertext)
-                        sessionCipher.decrypt(preKeyMessage)
+                        sessionCipher.decrypt(preKeyMessage, UsePqRatchet.YES)
                     } catch (e2: InvalidMessageException) {
                         throw SignalError.InvalidMessage(e2.message ?: "Failed to parse message")
                     }
@@ -283,13 +282,13 @@ actual class SignalSessionManager(
                 )
             } catch (e: SignalError) {
                 throw e
-            } catch (e: DuplicateMessageException) {
+            } catch (_: DuplicateMessageException) {
                 throw SignalError.InvalidMessage("Duplicate message")
             } catch (e: InvalidMessageException) {
                 throw SignalError.InvalidMessage(e.message ?: "Invalid message")
-            } catch (e: NoSessionException) {
+            } catch (_: NoSessionException) {
                 throw SignalError.NoSession(senderId)
-            } catch (e: UntrustedIdentityException) {
+            } catch (_: UntrustedIdentityException) {
                 val newKey = identityKeyStore.getIdentity(address)?.serialize() ?: ByteArray(0)
                 throw SignalError.UntrustedIdentity(senderId, newKey)
             }
@@ -314,7 +313,7 @@ actual class SignalSessionManager(
 
             if (preKeyStore.getCount() > 0) {
                 // Get the first available prekey
-                val nextId = database.signalPreKeyQueries.selectMaxPreKeyId().executeAsOneOrNull()?.MAX
+                val nextId = database.trickDatabaseQueries.selectMaxPreKeyId().executeAsOneOrNull()?.max_prekey_id
                 if (nextId != null) {
                     // Find an actual available prekey by iterating
                     var foundId: Int? = null
@@ -340,6 +339,11 @@ actual class SignalSessionManager(
                 preKeyPublic = null
             }
 
+            // Get Kyber prekey (required by libsignal 0.79.0+)
+            val kyberPreKeyId = kyberPreKeyStore.getLatestKyberPreKeyId()
+                ?: throw IllegalStateException("No Kyber prekey available")
+            val kyberPreKey = kyberPreKeyStore.loadKyberPreKey(kyberPreKeyId)
+
             PreKeyBundleData(
                 registrationId = registrationId,
                 deviceId = 1,
@@ -348,7 +352,10 @@ actual class SignalSessionManager(
                 signedPreKeyId = signedPreKeyId,
                 signedPreKeyPublic = signedPreKey.keyPair.publicKey.serialize(),
                 signedPreKeySignature = signedPreKey.signature,
-                identityKey = identityKeyPair.publicKey.serialize()
+                identityKey = identityKeyPair.publicKey.serialize(),
+                kyberPreKeyId = kyberPreKeyId,
+                kyberPreKeyPublic = kyberPreKey.keyPair.publicKey.serialize(),
+                kyberPreKeySignature = kyberPreKey.signature
             )
         }
     }
@@ -372,7 +379,7 @@ actual class SignalSessionManager(
     /**
      * Delete session (for re-keying or untrust).
      */
-    actual suspend fun deleteSession(peerId: String, deviceId: Int) = withContext(Dispatchers.IO) {
+    actual suspend fun deleteSession(peerId: String, deviceId: Int): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             checkInitialized()
             val address = SignalProtocolAddress(peerId, deviceId)
@@ -400,25 +407,16 @@ actual class SignalSessionManager(
             if (availableCount < threshold) {
                 Log.d(TAG, "Prekey count ($availableCount) < $threshold, replenishing...")
 
-                // Generate new prekeys
+                // Generate new prekeys using direct PreKeyRecord construction
                 val startId = preKeyStore.getNextId()
-                val newPreKeys = KeyHelper.generatePreKeys(startId, generateCount)
-                newPreKeys.forEach { preKey ->
-                    preKeyStore.storePreKey(preKey.id, preKey)
+                for (i in 0 until generateCount) {
+                    val preKeyId = startId + i
+                    val keyPair = ECKeyPair.generate()
+                    val preKeyRecord = PreKeyRecord(preKeyId, keyPair)
+                    preKeyStore.storePreKey(preKeyId, preKeyRecord)
                 }
 
-                // Upload new bundle to trcky.org if resolver available
-                preKeyBundleResolver?.let { resolver ->
-                    try {
-                        val bundle = generatePreKeyBundleInternal()
-                        resolver.uploadBundle(shortId, bundle)
-                        Log.d(TAG, "Uploaded new bundle to trcky.org")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to upload bundle: ${e.message}")
-                    }
-                }
-
-                Log.d(TAG, "Replenished ${newPreKeys.size} prekeys")
+                Log.d(TAG, "Replenished $generateCount prekeys")
             }
         }
     }
@@ -430,7 +428,7 @@ actual class SignalSessionManager(
         peerId: String,
         deviceId: Int,
         newIdentityKey: ByteArray
-    ) = withContext(Dispatchers.IO) {
+    ): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             checkInitialized()
             val address = SignalProtocolAddress(peerId, deviceId)
@@ -439,11 +437,11 @@ actual class SignalSessionManager(
             sessionStore.deleteSession(address)
 
             // Update identity with new key, mark as re-trusted
-            val existingRecord = database.signalIdentityKeyQueries
+            val existingRecord = database.trickDatabaseQueries
                 .selectIdentityKey(peerId, deviceId.toLong())
                 .executeAsOneOrNull()
 
-            database.signalIdentityKeyQueries.insertOrReplaceIdentityKey(
+            database.trickDatabaseQueries.insertOrReplaceIdentityKey(
                 address_name = peerId,
                 device_id = deviceId.toLong(),
                 identity_key = newIdentityKey,
@@ -524,7 +522,7 @@ actual class SignalSessionManager(
         val privateKeyData = cipher.doFinal(encryptedPrivateKey)
 
         val publicKey = IdentityKey(publicKeyData)
-        val privateKey = Curve.decodePrivatePoint(privateKeyData)
+        val privateKey = ECPrivateKey(privateKeyData)
         return IdentityKeyPair(publicKey, privateKey)
     }
 
@@ -535,71 +533,95 @@ actual class SignalSessionManager(
         Log.d(TAG, "Generating initial prekeys")
 
         // Generate one-time prekeys
-        val preKeys = KeyHelper.generatePreKeys(1, INITIAL_PREKEY_COUNT)
-        preKeys.forEach { preKey ->
-            database.signalPreKeyQueries.insertPreKey(
-                prekey_id = preKey.id.toLong(),
-                prekey_record = preKey.serialize()
+        for (preKeyId in 1..INITIAL_PREKEY_COUNT) {
+            val keyPair = ECKeyPair.generate()
+            val preKeyRecord = PreKeyRecord(preKeyId, keyPair)
+            database.trickDatabaseQueries.insertPreKey(
+                prekey_id = preKeyId.toLong(),
+                prekey_record = preKeyRecord.serialize()
             )
         }
 
         // Generate signed prekey
-        val signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, INITIAL_SIGNED_PREKEY_ID)
-        database.signalSignedPreKeyQueries.insertSignedPreKey(
-            signed_prekey_id = signedPreKey.id.toLong(),
-            signed_prekey_record = signedPreKey.serialize(),
-            created_at = System.currentTimeMillis()
+        val signedKeyPair = ECKeyPair.generate()
+        val signedPreKeySignature = identityKeyPair.privateKey.calculateSignature(
+            signedKeyPair.publicKey.serialize()
+        )
+        val timestamp = System.currentTimeMillis()
+        val signedPreKeyRecord = SignedPreKeyRecord(
+            INITIAL_SIGNED_PREKEY_ID,
+            timestamp,
+            signedKeyPair,
+            signedPreKeySignature
+        )
+        database.trickDatabaseQueries.insertSignedPreKey(
+            signed_prekey_id = INITIAL_SIGNED_PREKEY_ID.toLong(),
+            signed_prekey_record = signedPreKeyRecord.serialize(),
+            created_at = timestamp
         )
 
-        Log.d(TAG, "Generated ${preKeys.size} prekeys and 1 signed prekey")
+        // Generate Kyber prekey (required by libsignal 0.79.0+)
+        val kyberKeyPair = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
+        val kyberPreKeySignature = identityKeyPair.privateKey.calculateSignature(
+            kyberKeyPair.publicKey.serialize()
+        )
+        val kyberPreKeyRecord = KyberPreKeyRecord(
+            INITIAL_KYBER_PREKEY_ID,
+            timestamp,
+            kyberKeyPair,
+            kyberPreKeySignature
+        )
+        database.trickDatabaseQueries.insertKyberPreKey(
+            kyber_prekey_id = INITIAL_KYBER_PREKEY_ID.toLong(),
+            kyber_prekey_record = kyberPreKeyRecord.serialize(),
+            created_at = timestamp,
+            used_at = null
+        )
+
+        Log.d(TAG, "Generated $INITIAL_PREKEY_COUNT prekeys, 1 signed prekey, and 1 Kyber prekey")
     }
 
     /**
-     * Internal bundle generation without locking (for use within locked context).
+     * Construct a libsignal PreKeyBundle from our plain PreKeyBundleData.
+     * Note: libsignal 0.79.0+ requires Kyber prekey parameters for PQ ratchet.
      */
-    private fun generatePreKeyBundleInternal(): PreKeyBundleData {
-        val signedPreKeyId = signedPreKeyStore.getLatestSignedPreKeyId()
-            ?: throw IllegalStateException("No signed prekey available")
-        val signedPreKey = signedPreKeyStore.loadSignedPreKey(signedPreKeyId)
+    private fun createPreKeyBundle(
+        registrationId: Int,
+        deviceId: Int,
+        preKeyId: Int,
+        preKeyPublic: ECPublicKey?,
+        signedPreKeyId: Int,
+        signedPreKeyPublic: ECPublicKey,
+        signedPreKeySignature: ByteArray,
+        identityKey: IdentityKey,
+        kyberPreKeyId: Int,
+        kyberPreKeyPublic: org.signal.libsignal.protocol.kem.KEMPublicKey,
+        kyberPreKeySignature: ByteArray
+    ): PreKeyBundle {
+        // If there's no one‑time prekey, libsignal expects id = -1 and null key.
+        val effectivePreKeyId = if (preKeyPublic != null && preKeyId != 0) preKeyId else PreKeyBundle.NULL_PRE_KEY_ID
+        val effectivePreKeyPublic = if (preKeyPublic != null && preKeyId != 0) preKeyPublic else null
 
-        val preKeyId: Int?
-        val preKeyPublic: ByteArray?
-
-        if (preKeyStore.getCount() > 0) {
-            val maxId = database.signalPreKeyQueries.selectMaxPreKeyId().executeAsOneOrNull()?.MAX
-            if (maxId != null) {
-                var foundId: Int? = null
-                for (id in 1..maxId.toInt()) {
-                    if (preKeyStore.containsPreKey(id)) {
-                        foundId = id
-                        break
-                    }
-                }
-                if (foundId != null) {
-                    preKeyId = foundId
-                    preKeyPublic = preKeyStore.loadPreKey(foundId).keyPair.publicKey.serialize()
-                } else {
-                    preKeyId = null
-                    preKeyPublic = null
-                }
-            } else {
-                preKeyId = null
-                preKeyPublic = null
-            }
-        } else {
-            preKeyId = null
-            preKeyPublic = null
-        }
-
-        return PreKeyBundleData(
-            registrationId = registrationId,
-            deviceId = 1,
-            preKeyId = preKeyId,
-            preKeyPublic = preKeyPublic,
-            signedPreKeyId = signedPreKeyId,
-            signedPreKeyPublic = signedPreKey.keyPair.publicKey.serialize(),
-            signedPreKeySignature = signedPreKey.signature,
-            identityKey = identityKeyPair.publicKey.serialize()
+        return PreKeyBundle(
+            registrationId,
+            deviceId,
+            effectivePreKeyId,
+            effectivePreKeyPublic,
+            signedPreKeyId,
+            signedPreKeyPublic,
+            signedPreKeySignature,
+            identityKey,
+            kyberPreKeyId,
+            kyberPreKeyPublic,
+            kyberPreKeySignature
         )
+    }
+
+
+    /**
+     * Create a SessionCipher for encrypting/decrypting messages.
+     */
+    private fun createSessionCipher(address: SignalProtocolAddress): SessionCipher {
+        return SessionCipher(sessionStore, preKeyStore, signedPreKeyStore, kyberPreKeyStore, identityKeyStore, address)
     }
 }

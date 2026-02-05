@@ -35,7 +35,9 @@ data class SignalDecryptResult(
 
 /**
  * PreKey bundle data for X3DH key agreement.
- * Matches libsignal PreKeyBundle constructor parameters.
+ *
+ * Includes both classical EC prekeys and optional Kyber post-quantum prekeys,
+ * matching the libsignal PreKeyBundle constructor parameters.
  */
 data class PreKeyBundleData(
     val registrationId: Int,
@@ -45,7 +47,10 @@ data class PreKeyBundleData(
     val signedPreKeyId: Int,
     val signedPreKeyPublic: ByteArray,
     val signedPreKeySignature: ByteArray,
-    val identityKey: ByteArray
+    val identityKey: ByteArray,
+    val kyberPreKeyId: Int? = null,
+    val kyberPreKeyPublic: ByteArray? = null,
+    val kyberPreKeySignature: ByteArray? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -70,11 +75,8 @@ sealed class SignalError : Exception() {
     data class NoSession(val peerId: String) : SignalError() {
         override val message: String get() = "No Signal session exists for $peerId"
     }
-    data class SessionBuildFailed(val peerId: String, val cause: String) : SignalError() {
-        override val message: String get() = "Failed to build session with $peerId: $cause"
-    }
-    data class BundleFetchFailed(val shortId: String, val cause: String) : SignalError() {
-        override val message: String get() = "Failed to fetch prekey bundle for $shortId: $cause"
+    data class SessionBuildFailed(val peerId: String, val details: String) : SignalError() {
+        override val message: String get() = "Failed to build session with $peerId: $details"
     }
     data class DowngradeAttempt(val peerId: String) : SignalError() {
         override val message: String get() = "Rejected encryption downgrade from $peerId"
@@ -136,7 +138,7 @@ expect class SignalSessionManager {
     suspend fun decryptMessage(senderId: String, deviceId: Int = 1, ciphertext: ByteArray): SignalDecryptResult
 
     /**
-     * Generate PreKeyBundle for upload to trcky.org.
+     * Generate PreKeyBundle for sharing with peers (e.g. via QR).
      * Uses current signed prekey and an available one-time prekey.
      */
     suspend fun generatePreKeyBundle(): PreKeyBundleData
@@ -163,11 +165,9 @@ expect class SignalSessionManager {
 
     /**
      * Replenish prekeys if count < threshold.
-     * Also uploads new bundle to trcky.org.
      * Called on app startup and after session creation.
      */
     suspend fun replenishPreKeysIfNeeded(threshold: Int = 20, generateCount: Int = 100)
-
     /**
      * Confirm identity change after UntrustedIdentity error.
      * Deletes old session, updates stored identity, allows retry.
