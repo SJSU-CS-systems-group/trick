@@ -12,18 +12,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,17 +34,22 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main contacts list screen - the home screen of the app.
- * Displays all contacts that have exchanged keys, sorted by last message timestamp.
+ * Displays contacts in two sections: Connected (WiFi Aware connected) and All Contacts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsListScreen(
     onContactClick: (TrickContact) -> Unit,
     onAddContactClick: () -> Unit,
-    onTestMessagingClick: (() -> Unit)? = null,  // Temporary bypass for testing
+    connectedPeerIds: List<String> = emptyList(),
+    onTestMessagingClick: (() -> Unit)? = null,
     viewModel: ContactsListViewModel = koinViewModel()
 ) {
-    val contacts by viewModel.contacts.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(connectedPeerIds) {
+        viewModel.updateConnectedPeers(connectedPeerIds)
+    }
 
     Scaffold(
         topBar = {
@@ -56,18 +60,7 @@ fun ContactsListScreen(
                         style = MaterialTheme.typography.headlineMedium
                     )
                 },
-                actions = {
-                    // Temporary test button to bypass contacts and go directly to messaging
-                    if (onTestMessagingClick != null) {
-                        IconButton(onClick = onTestMessagingClick) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "Test Messaging",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
+                actions = {},
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -92,15 +85,14 @@ fun ContactsListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (contacts.isEmpty()) {
-                // Empty state
+            if (uiState.isEmpty) {
                 EmptyContactsState(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                // Contacts list
-                ContactsList(
-                    contacts = contacts,
+                SectionedContactsList(
+                    connectedContacts = uiState.connectedContacts,
+                    allContacts = uiState.allContacts,
                     onContactClick = onContactClick,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -110,27 +102,54 @@ fun ContactsListScreen(
 }
 
 /**
- * Lazy list of contacts with dividers.
+ * Lazy list of contacts organized into Connected and All Contacts sections.
  */
 @Composable
-private fun ContactsList(
-    contacts: List<TrickContact>,
+private fun SectionedContactsList(
+    connectedContacts: List<TrickContact>,
+    allContacts: List<TrickContact>,
     onContactClick: (TrickContact) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier) {
-        items(
-            items = contacts,
-            key = { it.shortId }
-        ) { contact ->
-            ContactItem(
-                contact = contact,
-                onClick = { onContactClick(contact) }
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 80.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            )
+        // Connected section (only if non-empty)
+        if (connectedContacts.isNotEmpty()) {
+            item(key = "connected_header") {
+                SectionHeader(title = "Connected")
+            }
+            items(
+                items = connectedContacts,
+                key = { "connected_${it.shortId}" }
+            ) { contact ->
+                ContactItem(
+                    contact = contact,
+                    onClick = { onContactClick(contact) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 80.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        // All Contacts section (only if non-empty)
+        if (allContacts.isNotEmpty()) {
+            item(key = "all_header") {
+                SectionHeader(title = "All Contacts")
+            }
+            items(
+                items = allContacts,
+                key = { "all_${it.shortId}" }
+            ) { contact ->
+                ContactItem(
+                    contact = contact,
+                    onClick = { onContactClick(contact) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 80.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            }
         }
     }
 }
@@ -171,4 +190,3 @@ private fun EmptyContactsState(
         )
     }
 }
-

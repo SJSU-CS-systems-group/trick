@@ -26,6 +26,7 @@ import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import net.discdd.trick.data.MessagePersistenceManager
 import net.discdd.trick.messaging.ChatMessage
+import net.discdd.trick.signal.SignalSessionManager
 import net.discdd.trick.screens.chat.ChatScreen
 import net.discdd.trick.screens.contacts.ContactsListScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
@@ -53,6 +54,7 @@ fun TrickNavHost(
     keyExchangeContent: KeyExchangeContent? = null
 ) {
     val messagePersistenceManager: MessagePersistenceManager = koinInject()
+    val signalSessionManager: SignalSessionManager = koinInject()
 
     val debugLogs = remember { mutableStateListOf<String>() }
     val discoveryStatus = remember { mutableStateOf("Waiting for permissions...") }
@@ -66,8 +68,12 @@ fun TrickNavHost(
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted) {
             while (true) {
+                val rawPeers = wifiAwareService.getConnectedPeers()
+                val peersWithSession = rawPeers.filter { peerId ->
+                    signalSessionManager.hasSession(peerId)
+                }
                 connectedPeerIds.clear()
-                connectedPeerIds.addAll(wifiAwareService.getConnectedPeers())
+                connectedPeerIds.addAll(peersWithSession)
                 delay(1000)
             }
         }
@@ -166,6 +172,7 @@ fun TrickNavHost(
                     // Navigate to key exchange to add a new contact
                     navController.navigate(Screen.KeyExchange.route)
                 },
+                connectedPeerIds = connectedPeerIds.toList(),
                 onTestMessagingClick = {
                     // Temporary bypass: go directly to messaging with a test contact ID
                     val testPeerId = "test-contact"

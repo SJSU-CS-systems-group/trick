@@ -1,6 +1,7 @@
 package net.discdd.trick
 
 import android.app.Application
+import android.content.Context
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.data.DatabaseProvider
 import net.discdd.trick.data.ImageStorage
@@ -18,8 +19,9 @@ class MessagingApp : Application() {
         // Create platform-specific module with NativeContactsManager and Signal components
         val database = DatabaseProvider.getDatabase()
         val platformModule = module {
+            single<Context> { this@MessagingApp }
             single { NativeContactsManager(this@MessagingApp) }
-            single { ImageStorage.create(this@MessagingApp) }
+            single { ImageStorage() }
             includes(androidModule())
         }
 
