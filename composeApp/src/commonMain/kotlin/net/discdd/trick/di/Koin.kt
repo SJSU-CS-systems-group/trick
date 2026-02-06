@@ -13,6 +13,8 @@ import net.discdd.trick.data.MessageRepository
 import net.discdd.trick.data.MessageRepositoryImpl
 import net.discdd.trick.screens.chat.ChatViewModel
 import net.discdd.trick.screens.contacts.ContactsListViewModel
+import net.discdd.trick.signal.SecureKeyStorage
+import net.discdd.trick.signal.SignalSessionManager
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
@@ -43,6 +45,10 @@ fun initKoin(database: TrickDatabase? = null, platformModule: Module? = null) {
                     // Provide repositories
                     single<MessageMetadataRepository> { MessageMetadataRepositoryImpl(get()) }
                     single<MessageRepository> { MessageRepositoryImpl(get()) }
+
+                    // Provide Signal components
+                    single { SecureKeyStorage() }
+                    single { SignalSessionManager(get(), get()) }
 
                     // Provide MessagePersistenceManager
                     single {

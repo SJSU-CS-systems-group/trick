@@ -9,9 +9,12 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * JSON-serializable representation of a PreKeyBundle for trcky.org API.
  *
- * Versioning:
- * - v1: Classical EC prekeys only
- * - v2: Adds Kyber post-quantum prekeys
+ * Bundle Format Versioning (NOT Signal Protocol versions):
+ * - v1: Classical EC prekeys only (deprecated - no longer supported)
+ * - v2: Adds Kyber post-quantum prekeys (required by libsignal 0.86.7+)
+ *
+ * Note: Signal Protocol itself doesn't have "v1" and "v2" - it's a continuous evolution.
+ * The requirement for Kyber is a security enhancement added to the protocol.
  */
 @Serializable
 data class PreKeyBundleJson(
@@ -65,14 +68,24 @@ object PreKeyBundleSerialization {
     /**
      * Deserialize JSON string to PreKeyBundleData.
      *
-     * Supports:
-     * - v1 bundles (no Kyber fields)
-     * - v2 bundles (with optional Kyber fields)
+     * Note: libsignal 0.86.7+ requires Kyber prekeys, so only v2 bundles are supported.
+     * v1 bundles (without Kyber) are rejected.
      */
     fun deserialize(jsonString: String): PreKeyBundleData {
         val parsed = json.decodeFromString<PreKeyBundleJson>(jsonString)
-        require(parsed.version == 1 || parsed.version == 2) {
-            "Unsupported bundle version: ${parsed.version}"
+        require(parsed.version == 2) {
+            "Unsupported bundle version: ${parsed.version}. Only v2 bundles with Kyber prekeys are supported (libsignal 0.86.7+ requires Kyber)."
+        }
+
+        // Validate required Kyber fields
+        require(parsed.kyberPreKeyId != null && parsed.kyberPreKeyId!! >= 0) {
+            "Bundle missing required Kyber prekey ID. Only v2 bundles with Kyber support are accepted."
+        }
+        require(parsed.kyberPreKeyPublic != null && parsed.kyberPreKeyPublic!!.isNotEmpty()) {
+            "Bundle missing required Kyber prekey public key. Only v2 bundles with Kyber support are accepted."
+        }
+        require(parsed.kyberPreKeySignature != null && parsed.kyberPreKeySignature!!.isNotEmpty()) {
+            "Bundle missing required Kyber prekey signature. Only v2 bundles with Kyber support are accepted."
         }
 
         return PreKeyBundleData(

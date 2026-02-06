@@ -86,10 +86,6 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sqldelight.android.driver)
 
-                // REAL Signal Foundation libsignal: include both per docs
-                implementation("org.signal:libsignal-android:0.79.0")
-                implementation("org.signal:libsignal-client:0.79.0")
-
                 // QR Code generation and scanning
                 implementation("com.google.zxing:core:3.5.3")
                 implementation("com.journeyapps:zxing-android-embedded:4.3.0")
@@ -154,16 +150,6 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            // Exclude non-Android libsignal native libraries per Signal docs
-            excludes += setOf("libsignal_jni*.dylib", "signal_jni*.dll")
-            // Optional: exclude testing JNI if not used
-            excludes += "libsignal_jni_testing.so"
-            // Exclude problematic META-INF files that can cause issues
-            excludes += "/META-INF/versions/**"
-        }
-        jniLibs {
-            // Keep only Android-compatible native libraries
-            excludes += setOf("**/*.dylib", "**/*.dll")
         }
     }
 
@@ -183,16 +169,27 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // Required by libsignal-android
-        isCoreLibraryDesugaringEnabled = true
     }
 }
 
 dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
-    // Required by libsignal-android when using Java 17 features
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }
+
+// Rust FFI build task for Android
+// Run with: ./gradlew buildRustAndroid
+tasks.register<Exec>("buildRustAndroid") {
+    workingDir = file("../rust/trick-signal-ffi")
+    commandLine("cargo", "ndk",
+        "-t", "aarch64-linux-android",
+        "-t", "x86_64-linux-android",
+        "-o", "${project.projectDir}/src/androidMain/jniLibs",
+        "build", "--release"
+    )
+}
+
+// Wire Rust build to Android build (optional - enable when Rust toolchain is set up)
+// tasks.named("preBuild") { dependsOn("buildRustAndroid") }
 
 sqldelight {
     databases {

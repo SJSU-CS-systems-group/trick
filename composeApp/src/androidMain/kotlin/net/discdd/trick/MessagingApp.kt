@@ -20,8 +20,7 @@ class MessagingApp : Application() {
         val platformModule = module {
             single { NativeContactsManager(this@MessagingApp) }
             single { ImageStorage(this@MessagingApp) }
-            // Include Signal protocol components
-            includes(androidModule(this@MessagingApp))
+            includes(androidModule())
         }
 
         // Initialize Koin with database and platform module

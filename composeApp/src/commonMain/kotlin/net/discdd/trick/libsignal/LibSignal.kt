@@ -1,8 +1,10 @@
 package net.discdd.trick.libsignal
 
+import net.discdd.trick.signal.SignalNativeBridge
+
 /**
- * KMP wrapper for libsignal functionality
- * Provides a clean, modern API over the native Rust libsignal library
+ * KMP wrapper for libsignal functionality.
+ * Delegates all cryptographic operations to [SignalNativeBridge] (Rust FFI).
  */
 
 // Core types
@@ -42,53 +44,64 @@ data class SignalProtocolAddress(
 data class SignalProtocolError(val message: String, val cause: String? = null)
 data class UntrustedIdentityError(val message: String)
 
-// Main API interface
-expect class LibSignalManager {
-    /**
-     * Generate a new identity key pair
-     */
-    fun generateIdentityKeyPair(): IdentityKeyPair
+/**
+ * Concrete class delegating EC operations to [SignalNativeBridge] (Rust FFI).
+ * No longer an expect/actual — works in commonMain for both platforms.
+ */
+class LibSignalManager {
 
-    /**
-     * Generate a new private key
-     */
-    fun generatePrivateKey(): PrivateKey
+    fun generateIdentityKeyPair(): IdentityKeyPair {
+        val (publicBytes, privateBytes) = SignalNativeBridge.generateIdentityKeyPair()
+        return IdentityKeyPair(PrivateKey(privateBytes), PublicKey(publicBytes))
+    }
 
-    /**
-     * Get public key from private key
-     */
-    fun getPublicKey(privateKey: PrivateKey): PublicKey
+    fun generatePrivateKey(): PrivateKey {
+        val (_, privateBytes) = SignalNativeBridge.generateIdentityKeyPair()
+        return PrivateKey(privateBytes)
+    }
 
-    /**
-     * Sign data with private key
-     */
-    fun sign(privateKey: PrivateKey, data: ByteArray): ByteArray
+    fun getPublicKey(privateKey: PrivateKey): PublicKey {
+        // Generate a key pair and sign+verify to derive the public key
+        // This is a limitation — for now, callers should use generateIdentityKeyPair()
+        // which returns both keys. This method is unused in production flows.
+        throw UnsupportedOperationException(
+            "getPublicKey(privateKey) is not supported. Use generateIdentityKeyPair() instead."
+        )
+    }
 
-    /**
-     * Verify signature with public key
-     */
-    fun verify(publicKey: PublicKey, data: ByteArray, signature: ByteArray): Boolean
+    fun sign(privateKey: PrivateKey, data: ByteArray): ByteArray {
+        return SignalNativeBridge.privateKeySign(privateKey.data, data)
+    }
 
-    /**
-     * Get version info
-     */
-    fun getVersion(): String
+    fun verify(publicKey: PublicKey, data: ByteArray, signature: ByteArray): Boolean {
+        return SignalNativeBridge.publicKeyVerify(publicKey.data, data, signature)
+    }
 
-    /**
-     * Encrypt data using a public key
-     */
-    fun encrypt(publicKey: PublicKey, data: ByteArray): ByteArray
+    fun getVersion(): String = "0.86.7-rust-ffi"
 
-    /**
-     * Decrypt data using a private key
-     */
-    fun decrypt(privateKey: PrivateKey, encryptedData: ByteArray): ByteArray
+    fun encrypt(publicKey: PublicKey, data: ByteArray): ByteArray {
+        throw UnsupportedOperationException(
+            "HPKE encrypt not available via Rust FFI. Use SignalSessionManager for message encryption."
+        )
+    }
 
-    /**
-     * Test if libsignal is working
-     */
-    fun test(): String
+    fun decrypt(privateKey: PrivateKey, encryptedData: ByteArray): ByteArray {
+        throw UnsupportedOperationException(
+            "HPKE decrypt not available via Rust FFI. Use SignalSessionManager for message decryption."
+        )
+    }
+
+    fun test(): String {
+        return try {
+            val keyPair = generateIdentityKeyPair()
+            val testData = "Hello Rust Signal FFI!".encodeToByteArray()
+            val signature = sign(keyPair.privateKey, testData)
+            val isValid = verify(keyPair.publicKey, testData, signature)
+            "Rust Signal FFI test: keygen OK, sign OK, verify=$isValid"
+        } catch (e: Exception) {
+            "Rust Signal FFI test failed: ${e.message}"
+        }
+    }
 }
 
-// Factory function
-expect fun createLibSignalManager(): LibSignalManager
+fun createLibSignalManager(): LibSignalManager = LibSignalManager()

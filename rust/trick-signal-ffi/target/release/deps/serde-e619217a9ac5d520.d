@@ -1,0 +1,14 @@
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/deps/serde-e619217a9ac5d520.d: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/build/serde-eca54499262bd750/out/private.rs
+
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/deps/libserde-e619217a9ac5d520.rlib: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/build/serde-eca54499262bd750/out/private.rs
+
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/deps/libserde-e619217a9ac5d520.rmeta: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/build/serde-eca54499262bd750/out/private.rs
+
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/build/serde-eca54499262bd750/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/release/build/serde-eca54499262bd750/out

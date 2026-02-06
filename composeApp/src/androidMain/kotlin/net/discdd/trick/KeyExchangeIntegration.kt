@@ -148,6 +148,17 @@ private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyExchangePayload,
     )
 
     // Extract Signal prekey bundle data
+    // Validate required Kyber fields (libsignal 0.86.7+ requires Kyber post-quantum prekeys)
+    require(bundle.kyber_prekey_id >= 0) {
+        "Bundle missing required Kyber prekey ID. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    require(bundle.kyber_prekey_public.size > 0) {
+        "Bundle missing required Kyber prekey public key. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    require(bundle.kyber_prekey_signature.size > 0) {
+        "Bundle missing required Kyber prekey signature. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    
     val preKeyBundleData = PreKeyBundleData(
         registrationId = bundle.registration_id,
         deviceId = bundle.signal_device_id,

@@ -1,13 +1,11 @@
 package net.discdd.trick.di
 
-import android.content.Context
-import net.discdd.trick.TrickDatabase
-import net.discdd.trick.signal.SignalSessionManager
 import org.koin.dsl.module
 
 /**
- * Android-specific Koin module for Signal Protocol components.
+ * Android-specific Koin module.
+ * Signal components are now provided in the common module.
  */
-fun androidModule(context: Context) = module {
-    single { SignalSessionManager(context, get<TrickDatabase>()) }
+fun androidModule() = module {
+    // Platform-specific services can be added here
 }
