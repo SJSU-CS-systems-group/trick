@@ -13,11 +13,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -26,11 +24,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
+import net.discdd.trick.data.MessagePersistenceManager
+import net.discdd.trick.messaging.ChatMessage
 import net.discdd.trick.screens.chat.ChatScreen
 import net.discdd.trick.screens.contacts.ContactsListScreen
-import net.discdd.trick.screens.messaging.Message
-import net.discdd.trick.screens.messaging.MessageType
 import net.discdd.trick.screens.messaging.WifiAwareService
+import org.koin.compose.koinInject
 
 /**
  * Optional: when non-null, platform provides a composable for the Key Exchange screen
@@ -53,11 +52,10 @@ fun TrickNavHost(
     onPickImage: OnPickImageRequest? = null,
     keyExchangeContent: KeyExchangeContent? = null
 ) {
-    val messages = remember { mutableStateListOf<Message>() }
+    val messagePersistenceManager: MessagePersistenceManager = koinInject()
+
     val debugLogs = remember { mutableStateListOf<String>() }
     val discoveryStatus = remember { mutableStateOf("Waiting for permissions...") }
-    val lastReceivedMessage = remember { mutableStateOf("") }
-    val lastSentMessage = remember { mutableStateOf("") }
     val localDeviceId = remember { mutableStateOf("") }
     val connectedPeerIds = remember { mutableStateListOf<String>() }
 
@@ -75,55 +73,60 @@ fun TrickNavHost(
         }
     }
 
+    fun handleIncomingMessage(
+        chatMessage: ChatMessage,
+        peerId: String?
+    ) {
+        val wasEncrypted = chatMessage.encryption_version != null
+        val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
+
+        val textContent = chatMessage.text_content
+        if (textContent != null) {
+            val msg = textContent.text
+            val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
+            debugLogs.add(
+                "[App] Message received${if (wasEncrypted) " (encrypted)" else ""}: $msg"
+            )
+            println("[App] Message received: $msg")
+
+            // Persist non-system messages
+            if (!isSystemMessage && effectivePeerId != null) {
+                messagePersistenceManager.persistReceivedTextMessage(
+                    peerId = effectivePeerId,
+                    content = msg,
+                    isEncrypted = wasEncrypted,
+                    messageId = chatMessage.message_id.ifBlank { null }
+                )
+            }
+        }
+
+        val photoContent = chatMessage.photo_content
+        if (photoContent != null) {
+            val imageData = photoContent.data_.toByteArray()
+            val filename = photoContent.filename ?: "image"
+            debugLogs.add(
+                "[App] Image received${if (wasEncrypted) " (encrypted)" else ""}: $filename (${imageData.size} bytes)"
+            )
+            println("[App] Image received: $filename")
+
+            if (effectivePeerId != null) {
+                messagePersistenceManager.persistReceivedImageMessage(
+                    peerId = effectivePeerId,
+                    imageData = imageData,
+                    filename = filename,
+                    isEncrypted = wasEncrypted,
+                    messageId = chatMessage.message_id.ifBlank { null }
+                )
+            }
+        }
+    }
+
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted) {
             discoveryStatus.value = "Starting..."
             debugLogs.add("[UI] Starting discovery...")
             wifiAwareService.startDiscovery { chatMessage, peerId ->
-                val wasEncrypted = chatMessage.encryption_version != null
-                println("[DEBUG] Received message - encryption_version: ${chatMessage.encryption_version}, wasEncrypted: $wasEncrypted")
-                val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
-                val textContent = chatMessage.text_content
-                if (textContent != null) {
-                    val msg = textContent.text
-                    val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
-                    debugLogs.add(
-                        "[App] Message received${if (wasEncrypted) " (encrypted)" else ""}: $msg"
-                    )
-                    println("[App] Message received: $msg")
-                    messages.add(
-                        Message(
-                            content = msg,
-                            isSent = false,
-                            isServiceMessage = isSystemMessage,
-                            isEncrypted = wasEncrypted,
-                            peerId = effectivePeerId
-                        )
-                    )
-                    lastReceivedMessage.value = msg
-                }
-                val photoContent = chatMessage.photo_content
-                if (photoContent != null) {
-                    val imageData = photoContent.data_.toByteArray()
-                    val filename = photoContent.filename ?: "image"
-                    debugLogs.add(
-                        "[App] Image received${if (wasEncrypted) " (encrypted)" else ""}: $filename (${imageData.size} bytes)"
-                    )
-                    println("[App] Image received: $filename")
-                    messages.add(
-                        Message(
-                            content = "[Image]",
-                            isSent = false,
-                            isServiceMessage = false,
-                            type = MessageType.IMAGE,
-                            imageData = imageData,
-                            filename = filename,
-                            isEncrypted = wasEncrypted,
-                            peerId = effectivePeerId
-                        )
-                    )
-                    lastReceivedMessage.value = filename
-                }
+                handleIncomingMessage(chatMessage, peerId)
             }
             discoveryStatus.value = "Running"
             debugLogs.add("[UI] Discovery running.")
@@ -140,45 +143,7 @@ fun TrickNavHost(
         debugLogs.add("[UI] Discovery stopped. Restarting...")
         discoveryStatus.value = "Restarting..."
         wifiAwareService.startDiscovery { chatMessage, peerId ->
-            val wasEncrypted = chatMessage.encryption_version != null
-            val effectivePeerId = peerId ?: chatMessage.sender_id.ifBlank { null }
-            val textContent = chatMessage.text_content
-            if (textContent != null) {
-                val msg = textContent.text
-                val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
-                debugLogs.add("[App] Message received${if (wasEncrypted) " (encrypted)" else ""} (refresh): $msg")
-                println("[App] Message received (refresh): $msg")
-                messages.add(
-                    Message(
-                        content = msg,
-                        isSent = false,
-                        isServiceMessage = isSystemMessage,
-                        isEncrypted = wasEncrypted,
-                        peerId = effectivePeerId
-                    )
-                )
-                lastReceivedMessage.value = msg
-            }
-            val photoContent = chatMessage.photo_content
-            if (photoContent != null) {
-                val imageData = photoContent.data_.toByteArray()
-                val filename = photoContent.filename ?: "image"
-                debugLogs.add("[App] Image received${if (wasEncrypted) " (encrypted)" else ""} (refresh): $filename (${imageData.size} bytes)")
-                println("[App] Image received (refresh): $filename")
-                messages.add(
-                    Message(
-                        content = "[Image]",
-                        isSent = false,
-                        isServiceMessage = false,
-                        type = MessageType.IMAGE,
-                        imageData = imageData,
-                        filename = filename,
-                        isEncrypted = wasEncrypted,
-                        peerId = effectivePeerId
-                    )
-                )
-                lastReceivedMessage.value = filename
-            }
+            handleIncomingMessage(chatMessage, peerId)
         }
         discoveryStatus.value = "Running (refreshed)"
         debugLogs.add("[UI] Discovery restarted successfully.")
@@ -224,7 +189,6 @@ fun TrickNavHost(
                 backStackEntry.arguments?.getString("peerId") ?: shortId,
                 "UTF-8"
             )
-            val filteredMessages = messages.filter { it.peerId == peerId }
             val isContactConnected = peerId in connectedPeerIds
             val onPickImageForScreen: (() -> Unit)? = if (onPickImage != null) {
                 {
@@ -232,60 +196,39 @@ fun TrickNavHost(
                         debugLogs.add("[App] Image picked: $filename (${data.size} bytes)")
                         println("[App] Image picked: $filename")
                         wifiAwareService.sendPictureToPeer(data, filename, mimeType, peerId)
-                        messages.add(
-                            Message(
-                                content = "[Image]",
-                                isSent = true,
-                                isServiceMessage = false,
-                                type = MessageType.IMAGE,
-                                imageData = data,
-                                filename = filename,
-                                isEncrypted = true,
-                                peerId = peerId
-                            )
+                        messagePersistenceManager.persistSentImageMessage(
+                            shortId = shortId,
+                            imageData = data,
+                            filename = filename,
+                            isEncrypted = true
                         )
-                        lastSentMessage.value = filename
                     }
                 }
             } else null
 
             ChatScreen(
                 shortId = shortId,
-                messages = filteredMessages,
                 isContactConnected = isContactConnected,
                 onSend = { msg ->
                     debugLogs.add("[App] Sending message: $msg")
                     println("[App] Sending message: $msg")
                     wifiAwareService.sendMessageToPeer(msg, peerId)
-                    messages.add(
-                        Message(
-                            content = msg,
-                            isSent = true,
-                            isServiceMessage = false,
-                            type = MessageType.TEXT,
-                            isEncrypted = true,
-                            peerId = peerId
-                        )
+                    messagePersistenceManager.persistSentTextMessage(
+                        shortId = shortId,
+                        content = msg,
+                        isEncrypted = true
                     )
-                    lastSentMessage.value = msg
                 },
                 onSendPicture = { imageData, filename, mimeType ->
                     debugLogs.add("[App] Sending picture: $filename (${imageData.size} bytes)")
                     println("[App] Sending picture: $filename")
                     wifiAwareService.sendPictureToPeer(imageData, filename, mimeType, peerId)
-                    messages.add(
-                        Message(
-                            content = "[Image]",
-                            isSent = true,
-                            isServiceMessage = false,
-                            type = MessageType.IMAGE,
-                            imageData = imageData,
-                            filename = filename,
-                            isEncrypted = true,
-                            peerId = peerId
-                        )
+                    messagePersistenceManager.persistSentImageMessage(
+                        shortId = shortId,
+                        imageData = imageData,
+                        filename = filename,
+                        isEncrypted = true
                     )
-                    lastSentMessage.value = filename ?: "[Image]"
                 },
                 onBack = {
                     wifiAwareService.setDesiredPeerId(null)

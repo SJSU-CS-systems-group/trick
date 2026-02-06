@@ -46,10 +46,8 @@ import org.koin.core.parameter.parametersOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("UNUSED_PARAMETER")
 fun ChatScreen(
     shortId: String,
-    messages: List<Message>,
     isContactConnected: Boolean,
     onSend: (String) -> Unit,
     onSendPicture: (ByteArray, String?, String?) -> Unit,
@@ -58,6 +56,7 @@ fun ChatScreen(
     viewModel: ChatViewModel = koinViewModel(parameters = { parametersOf(shortId) })
 ) {
     val contact by viewModel.contact.collectAsState()
+    val messages by viewModel.messages.collectAsState()
     val title = contact?.displayName?.takeIf { it.isNotBlank() }
         ?: shortId.ifBlank { "Unknown" }.takeIf { it != "Unknown" }
         ?: "Unknown"

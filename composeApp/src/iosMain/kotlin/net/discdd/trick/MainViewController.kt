@@ -3,6 +3,7 @@ package net.discdd.trick
 import androidx.compose.ui.window.ComposeUIViewController
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.data.DatabaseProvider
+import net.discdd.trick.data.ImageStorage
 import net.discdd.trick.di.initKoin
 import net.discdd.trick.screens.messaging.WifiAwareServiceImpl
 import org.koin.dsl.module
@@ -17,6 +18,7 @@ fun MainViewController() = ComposeUIViewController {
         // Create platform-specific module with NativeContactsManager stub
         val platformModule = module {
             single { NativeContactsManager() }
+            single { ImageStorage() }
         }
 
         initKoin(database, platformModule)
