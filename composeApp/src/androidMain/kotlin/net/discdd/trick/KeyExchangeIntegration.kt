@@ -291,9 +291,17 @@ fun AndroidKeyExchangeScreen(
 
             Log.d("KeyExchange", "Generated ${qrPayloads.size} QR codes")
 
+            // Ensure QR codes are in deterministic order (1..N) based on embedded part numbers.
+            // This guards against any accidental reordering so the UI always shows 1 -> 2 -> 3.
+            val orderedPayloads =
+                qrPayloads.sortedBy { payload ->
+                    val (partNumber, _, _) = parseQRChunk(payload)
+                    partNumber
+                }
+
             withContext(Dispatchers.Main) {
                 qrResult = MultiQRResult(
-                    payloads = qrPayloads,
+                    payloads = orderedPayloads,
                     shortId = baseResult.shortId
                 )
             }

@@ -122,27 +122,6 @@ fun KeyExchangeScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Previous button - always show when multiple QR codes
-                                if (qrCodePayloads.size > 1) {
-                                    IconButton(
-                                        onClick = {
-                                            currentQrIndex = (currentQrIndex - 1 + qrCodePayloads.size) % qrCodePayloads.size
-                                        },
-                                        enabled = qrCodePayloads.size > 1,
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.ArrowBack,
-                                            contentDescription = "Previous QR",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-                                } else {
-                                    // Spacer to maintain layout when only one QR code
-                                    Spacer(modifier = Modifier.width(48.dp))
-                                }
-
                                 // QR Code
                                 Box(
                                     modifier = Modifier
@@ -153,13 +132,12 @@ fun KeyExchangeScreen(
                                     QRCodeView(payload = qrCodePayloads[currentQrIndex])
                                 }
 
-                                // Next button - always show when multiple QR codes
+                                // Next button on the right side
                                 if (qrCodePayloads.size > 1) {
                                     IconButton(
                                         onClick = {
                                             currentQrIndex = (currentQrIndex + 1) % qrCodePayloads.size
                                         },
-                                        enabled = qrCodePayloads.size > 1,
                                         modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
@@ -169,9 +147,6 @@ fun KeyExchangeScreen(
                                             modifier = Modifier.size(32.dp)
                                         )
                                     }
-                                } else {
-                                    // Spacer to maintain layout when only one QR code
-                                    Spacer(modifier = Modifier.width(48.dp))
                                 }
                             }
                         }
