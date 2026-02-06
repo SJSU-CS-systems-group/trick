@@ -9,8 +9,7 @@ import net.discdd.trick.util.ShortIdGenerator
 
 /**
  * Payload structure for QR code key exchange.
- * Contains the device ID, public key, timestamp, signature, optional shortId for trcky.org URL,
- * and optional embedded Signal prekey bundle JSON for fully offline session setup.
+ * Contains the device ID, public key, timestamp, signature, and optional shortId for trcky.org URL.
  */
 @Serializable
 data class KeyExchangePayload(
@@ -18,8 +17,7 @@ data class KeyExchangePayload(
     val publicKeyHex: String,
     val timestamp: Long,
     val signatureHex: String,
-    val shortId: String? = null,
-    val signalPreKeyBundleJson: String? = null
+    val shortId: String? = null
 )
 
 /**
@@ -225,8 +223,3 @@ sealed class SignalScanResult {
         val newIdentityKey: ByteArray
     ) : SignalScanResult()
 }
-
-// NOTE: Additional Signal-specific key exchange helpers that depended on
-// PreKeyBundleResolver have been removed. Signal prekey bundles are now
-// exchanged purely offline by embedding them in the QR payload via
-// the signalPreKeyBundleJson field above.

@@ -10,8 +10,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * JSON-serializable representation of a PreKeyBundle for trcky.org API.
  *
  * Bundle Format Versioning (NOT Signal Protocol versions):
- * - v1: Classical EC prekeys only (deprecated - no longer supported)
- * - v2: Adds Kyber post-quantum prekeys (required by libsignal 0.86.7+)
+ * - v2: Includes Kyber post-quantum prekeys (required by libsignal 0.86.7+)
  *
  * Note: Signal Protocol itself doesn't have "v1" and "v2" - it's a continuous evolution.
  * The requirement for Kyber is a security enhancement added to the protocol.
@@ -69,7 +68,6 @@ object PreKeyBundleSerialization {
      * Deserialize JSON string to PreKeyBundleData.
      *
      * Note: libsignal 0.86.7+ requires Kyber prekeys, so only v2 bundles are supported.
-     * v1 bundles (without Kyber) are rejected.
      */
     fun deserialize(jsonString: String): PreKeyBundleData {
         val parsed = json.decodeFromString<PreKeyBundleJson>(jsonString)
