@@ -187,12 +187,7 @@ actual object SignalNativeBridge {
 
         val result = identityPublic.usePinned { idPub ->
             identityPrivate.usePinned { idPriv ->
-<<<<<<< HEAD
-                // Handle empty sessionRecord safely
-                sessionRecord.usePinnedSafe { sessPtr, sessLen ->
-=======
                 sessionRecord.usePinned { sess ->
->>>>>>> e13ac59 (Full migration to Rust Libsignal via FFI for Android and iOS code unification)
                     peerIdentity.usePinned { peer ->
                         plaintext.usePinned { pt ->
                             outCiphertext.usePinned { ct ->
