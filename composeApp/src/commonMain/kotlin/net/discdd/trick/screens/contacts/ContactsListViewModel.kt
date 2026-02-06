@@ -45,3 +45,4 @@ class ContactsListViewModel(
         initialValue = emptyList()
     )
 }
+

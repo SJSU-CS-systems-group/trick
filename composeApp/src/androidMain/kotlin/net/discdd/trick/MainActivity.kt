@@ -13,15 +13,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import net.discdd.trick.screens.messaging.WifiAwareServiceImpl
+import net.discdd.trick.signal.SignalSessionManager
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
-class MainActivity : ComponentActivity() {
-    
+class MainActivity : ComponentActivity(), KoinComponent {
+
     // Track permission state
     private val permissionsGranted = mutableStateOf(false)
     private val wifiAwareSupported = mutableStateOf(false)
-    
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -34,14 +38,14 @@ class MainActivity : ComponentActivity() {
             permissionsGranted.value = false
         }
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
+
         // Check WiFi Aware support FIRST
         wifiAwareSupported.value = isWifiAwareSupported()
-        
+
         // Only request permissions if WiFi Aware is supported
         if (wifiAwareSupported.value) {
             if (checkPermissions()) {
@@ -50,13 +54,25 @@ class MainActivity : ComponentActivity() {
                 requestRequiredPermissions()
             }
         }
-        
+
         setContent {
             // Remove when https://issuetracker.google.com/issues/364713509 is fixed
             LaunchedEffect(isSystemInDarkTheme()) {
                 enableEdgeToEdge()
             }
-            val wifiAwareService = WifiAwareServiceImpl(this@MainActivity)
+
+            // Get SignalSessionManager from Koin and initialize it
+            val signalSessionManager: SignalSessionManager = get()
+
+            // Initialize Signal protocol on startup
+            LaunchedEffect(Unit) {
+                signalSessionManager.initialize()
+                signalSessionManager.replenishPreKeysIfNeeded()
+            }
+
+            // Create WifiAwareService with SignalSessionManager
+            val wifiAwareService = remember { WifiAwareServiceImpl(this@MainActivity, signalSessionManager) }
+
             AndroidApp(
                 wifiAwareService = wifiAwareService,
                 permissionsGranted = permissionsGranted.value,

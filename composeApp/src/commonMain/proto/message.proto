@@ -41,6 +41,43 @@ message ChatMessage {
 
   // Encryption fields (optional for backward compatibility)
   optional bytes encrypted_content = 6;      // Encrypted serialized TextContent or PhotoContent
-  optional string encryption_version = 7;    // Encryption version identifier (e.g., "hpke-v1")
-  optional bytes sender_public_key = 8;      // Sender's public key for verification
+  optional string encryption_version = 7;    // Encryption version identifier: "signal-v1" or "hpke-v1"
+
+  // Signal protocol metadata (informational, for signal-v1 messages)
+  optional int32 message_type = 9;           // CiphertextMessage type: 2=Whisper, 3=PreKey
+  optional int32 registration_id = 10;       // Sender's Signal registration ID
+  optional int32 sender_device_id = 11;      // Sender's device ID (default 1)
+}
+
+// Key exchange payload for QR code - compact binary format with full Signal bundle
+// This format uses protobuf + Base32 encoding for QR alphanumeric mode compatibility
+// Max size ~1960 bytes raw → ~3136 chars Base32 → fits in QR Version 35-40 (alphanumeric)
+message KeyExchangeBundle {
+  // Identity layer (for signature verification)
+  bytes device_id = 1;          // UUID as 16 bytes
+  bytes public_key = 2;         // Ed25519 public key (32 bytes)
+  int64 timestamp = 3;          // Unix timestamp milliseconds
+  bytes signature = 4;          // Ed25519 signature (64 bytes)
+  string short_id = 5;          // ~6 char hex identifier
+
+  // Signal prekey bundle fields
+  int32 registration_id = 10;
+  int32 signal_device_id = 11;
+
+  // Optional EC one-time prekey
+  optional int32 prekey_id = 12;
+  optional bytes prekey_public = 13;        // EC public key (~33 bytes)
+
+  // Signed prekey (required)
+  int32 signed_prekey_id = 14;
+  bytes signed_prekey_public = 15;          // EC public key (32 bytes)
+  bytes signed_prekey_signature = 16;       // Signature (64 bytes)
+
+  // Identity key
+  bytes identity_key = 17;                  // EC public key (33 bytes)
+
+  // Kyber post-quantum prekey (required for libsignal 0.79+)
+  int32 kyber_prekey_id = 18;
+  bytes kyber_prekey_public = 19;           // Kyber-1024 public key (~1568 bytes)
+  bytes kyber_prekey_signature = 20;        // Signature (64 bytes)
 }

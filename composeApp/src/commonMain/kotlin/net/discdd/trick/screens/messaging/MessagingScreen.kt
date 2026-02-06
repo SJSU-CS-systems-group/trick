@@ -332,14 +332,25 @@ fun MessagingScreen(
 
 @Composable
 fun MessageBubble(message: Message) {
-    val isSystemMessage = message.content.startsWith("[System]")
     val isErrorMessage = message.content.startsWith("[Error]")
+    
+    // Remove [System] prefix if it exists (for backward compatibility)
+    val displayContent = if (message.content.startsWith("[System]")) {
+        message.content.removePrefix("[System]").trim()
+    } else {
+        message.content
+    }
+
+    // Suppress error messages from being displayed in the UI
+    if (isErrorMessage) {
+        return
+    }
 
     Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement =
                     when {
-                        message.isServiceMessage || isSystemMessage || isErrorMessage ->
+                        message.isServiceMessage || isErrorMessage ->
                                 Arrangement.Center
                         message.isSent -> Arrangement.End
                         else -> Arrangement.Start
@@ -353,8 +364,6 @@ fun MessageBubble(message: Message) {
                                         when {
                                             isErrorMessage ->
                                                     MaterialTheme.colorScheme.errorContainer
-                                            isSystemMessage ->
-                                                    MaterialTheme.colorScheme.tertiaryContainer
                                             message.isServiceMessage ->
                                                     MaterialTheme.colorScheme.secondaryContainer
                                             message.isSent -> MaterialTheme.colorScheme.primary
@@ -401,12 +410,10 @@ fun MessageBubble(message: Message) {
                 } else {
                     // Display text message
                     Text(
-                            text = message.content,
+                            text = displayContent,
                             color =
                                     when {
                                         isErrorMessage -> MaterialTheme.colorScheme.onErrorContainer
-                                        isSystemMessage ->
-                                                MaterialTheme.colorScheme.onTertiaryContainer
                                         message.isServiceMessage ->
                                                 MaterialTheme.colorScheme.onSecondaryContainer
                                         message.isSent -> MaterialTheme.colorScheme.onPrimary
@@ -419,7 +426,6 @@ fun MessageBubble(message: Message) {
                 // Show encryption indicator for encrypted messages
                 if (message.isEncrypted &&
                                 !message.isServiceMessage &&
-                                !isSystemMessage &&
                                 !isErrorMessage
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))

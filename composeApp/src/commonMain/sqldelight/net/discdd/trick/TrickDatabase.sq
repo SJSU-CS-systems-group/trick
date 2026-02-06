@@ -81,3 +81,200 @@ WHERE id = ?;
 deleteMessagesByShortId:
 DELETE FROM Message
 WHERE short_id = ?;
+
+-- ============================================================
+-- SIGNAL PROTOCOL TABLES
+-- ============================================================
+
+-- Our device's Signal identity (singleton)
+-- This is the SINGLE SOURCE OF TRUTH for our identity
+CREATE TABLE SignalIdentity (
+    id INTEGER NOT NULL PRIMARY KEY DEFAULT 1,
+    registration_id INTEGER NOT NULL,
+    identity_key_public BLOB NOT NULL,
+    identity_key_private_encrypted BLOB NOT NULL,
+    identity_key_private_iv BLOB NOT NULL,
+    short_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    CHECK (id = 1)
+);
+
+-- Peer identity keys (TOFU + change detection)
+-- Used by IdentityKeyStore implementation
+CREATE TABLE SignalIdentityKey (
+    address_name TEXT NOT NULL,
+    device_id INTEGER NOT NULL,
+    identity_key BLOB NOT NULL,
+    trust_level INTEGER NOT NULL DEFAULT 1,
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    PRIMARY KEY (address_name, device_id)
+);
+
+CREATE INDEX SignalIdentityKey_address ON SignalIdentityKey(address_name);
+
+-- Double Ratchet session records
+-- Used by SessionStore implementation
+CREATE TABLE SignalSession (
+    address_name TEXT NOT NULL,
+    device_id INTEGER NOT NULL,
+    session_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (address_name, device_id)
+);
+
+CREATE INDEX SignalSession_address ON SignalSession(address_name);
+
+-- One-time prekeys
+-- Used by PreKeyStore implementation
+-- libsignal calls removePreKey() after consumption
+CREATE TABLE SignalPreKey (
+    prekey_id INTEGER NOT NULL PRIMARY KEY,
+    prekey_record BLOB NOT NULL
+);
+
+-- Signed prekeys (longer-lived)
+-- Used by SignedPreKeyStore implementation
+CREATE TABLE SignalSignedPreKey (
+    signed_prekey_id INTEGER NOT NULL PRIMARY KEY,
+    signed_prekey_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+-- Kyber post-quantum prekeys
+-- Used by KyberPreKeyStore / PQ X3DH
+CREATE TABLE SignalKyberPreKey (
+    kyber_prekey_id INTEGER NOT NULL PRIMARY KEY,
+    kyber_prekey_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER
+);
+
+-- ============================================================
+-- SIGNAL IDENTITY QUERIES (singleton)
+-- ============================================================
+
+selectIdentity:
+SELECT * FROM SignalIdentity WHERE id = 1;
+
+insertIdentity:
+INSERT INTO SignalIdentity(id, registration_id, identity_key_public, identity_key_private_encrypted, identity_key_private_iv, short_id, created_at)
+VALUES (1, ?, ?, ?, ?, ?, ?);
+
+updateIdentityKeys:
+UPDATE SignalIdentity
+SET identity_key_public = ?, identity_key_private_encrypted = ?, identity_key_private_iv = ?
+WHERE id = 1;
+
+-- ============================================================
+-- SIGNAL IDENTITY KEY QUERIES (peer identities)
+-- ============================================================
+
+selectIdentityKey:
+SELECT * FROM SignalIdentityKey WHERE address_name = ? AND device_id = ?;
+
+insertOrReplaceIdentityKey:
+INSERT OR REPLACE INTO SignalIdentityKey(address_name, device_id, identity_key, trust_level, first_seen_at, last_seen_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateIdentityKeyTrust:
+UPDATE SignalIdentityKey SET trust_level = ?, last_seen_at = ? WHERE address_name = ? AND device_id = ?;
+
+deleteIdentityKey:
+DELETE FROM SignalIdentityKey WHERE address_name = ? AND device_id = ?;
+
+-- ============================================================
+-- SIGNAL SESSION QUERIES
+-- ============================================================
+
+selectSession:
+SELECT session_record FROM SignalSession WHERE address_name = ? AND device_id = ?;
+
+selectAllSessionsForAddress:
+SELECT device_id FROM SignalSession WHERE address_name = ?;
+
+containsSession:
+SELECT COUNT(*) FROM SignalSession WHERE address_name = ? AND device_id = ?;
+
+insertOrReplaceSession:
+INSERT OR REPLACE INTO SignalSession(address_name, device_id, session_record, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?);
+
+deleteSession:
+DELETE FROM SignalSession WHERE address_name = ? AND device_id = ?;
+
+deleteAllSessionsForAddress:
+DELETE FROM SignalSession WHERE address_name = ?;
+
+-- ============================================================
+-- SIGNAL PREKEY QUERIES
+-- ============================================================
+
+selectPreKey:
+SELECT prekey_record FROM SignalPreKey WHERE prekey_id = ?;
+
+containsPreKey:
+SELECT COUNT(*) FROM SignalPreKey WHERE prekey_id = ?;
+
+insertPreKey:
+INSERT INTO SignalPreKey(prekey_id, prekey_record) VALUES (?, ?);
+
+deletePreKey:
+DELETE FROM SignalPreKey WHERE prekey_id = ?;
+
+countPreKeys:
+SELECT COUNT(*) FROM SignalPreKey;
+
+selectMaxPreKeyId:
+SELECT MAX(prekey_id) AS max_prekey_id FROM SignalPreKey;
+
+-- ============================================================
+-- SIGNAL SIGNED PREKEY QUERIES
+-- ============================================================
+
+selectSignedPreKey:
+SELECT signed_prekey_record FROM SignalSignedPreKey WHERE signed_prekey_id = ?;
+
+containsSignedPreKey:
+SELECT COUNT(*) FROM SignalSignedPreKey WHERE signed_prekey_id = ?;
+
+insertSignedPreKey:
+INSERT INTO SignalSignedPreKey(signed_prekey_id, signed_prekey_record, created_at) VALUES (?, ?, ?);
+
+deleteSignedPreKey:
+DELETE FROM SignalSignedPreKey WHERE signed_prekey_id = ?;
+
+selectAllSignedPreKeys:
+SELECT * FROM SignalSignedPreKey ORDER BY created_at DESC;
+
+selectLatestSignedPreKeyId:
+SELECT signed_prekey_id FROM SignalSignedPreKey ORDER BY created_at DESC LIMIT 1;
+
+-- ============================================================
+-- SIGNAL KYBER PREKEY QUERIES
+-- ============================================================
+
+selectKyberPreKey:
+SELECT kyber_prekey_record FROM SignalKyberPreKey WHERE kyber_prekey_id = ?;
+
+containsKyberPreKey:
+SELECT COUNT(*) FROM SignalKyberPreKey WHERE kyber_prekey_id = ?;
+
+insertKyberPreKey:
+INSERT OR REPLACE INTO SignalKyberPreKey(kyber_prekey_id, kyber_prekey_record, created_at, used_at)
+VALUES (?, ?, ?, ?);
+
+markKyberPreKeyUsed:
+UPDATE SignalKyberPreKey
+SET used_at = ?
+WHERE kyber_prekey_id = ?;
+
+countKyberPreKeys:
+SELECT COUNT(*) FROM SignalKyberPreKey;
+
+selectMaxKyberPreKeyId:
+SELECT MAX(kyber_prekey_id) AS max_kyber_prekey_id FROM SignalKyberPreKey;
+
+selectAllKyberPreKeys:
+SELECT kyber_prekey_record FROM SignalKyberPreKey WHERE used_at IS NULL ORDER BY created_at DESC;
