@@ -311,6 +311,7 @@ fun AndroidKeyExchangeScreen(
         MultiQRScannerScreen(
             scannedParts = scannedChunks.size,
             totalParts = expectedTotalParts,
+            alreadyScannedChunkIds = scannedChunks.keys.toSet(),
             onQRCodeScanned = { qrCode: String ->
                 scope.launch {
                     // Parse the chunk
@@ -327,8 +328,8 @@ fun AndroidKeyExchangeScreen(
 
                     Log.d("KeyExchange", "Scanned part $partNumber of $totalParts")
 
-                    // Update state
-                    withContext(Dispatchers.Main) {
+                    // Update state, check completion, and capture chunks for reassembly
+                    val (allPartsReceived, chunksForReassembly) = withContext(Dispatchers.Main) {
                         expectedTotalParts = totalParts
                         scannedChunks = scannedChunks.toMutableMap().apply {
                             put(partNumber, chunkData)
@@ -340,15 +341,24 @@ fun AndroidKeyExchangeScreen(
                             "Scanned $partNumber of $totalParts",
                             Toast.LENGTH_SHORT
                         ).show()
+
+                        // Check if all parts received and capture chunks (inside Main context for consistent read)
+                        val allReceived = scannedChunks.size >= totalParts
+                        val chunks = if (allReceived) {
+                            (1..totalParts).mapNotNull { scannedChunks[it] }
+                        } else {
+                            null
+                        }
+                        Pair(allReceived, chunks)
                     }
 
-                    // Check if all parts received
-                    if (scannedChunks.size < totalParts) {
-                        return@launch // Wait for more parts
+                    // Wait for more parts if not all received
+                    if (!allPartsReceived || chunksForReassembly == null) {
+                        return@launch
                     }
 
                     // Reassemble the payload
-                    val reassembled = (1..totalParts).mapNotNull { scannedChunks[it] }
+                    val reassembled = chunksForReassembly
                     if (reassembled.size != totalParts) {
                         Log.e("KeyExchange", "Missing chunks after reassembly")
                         return@launch
@@ -449,11 +459,12 @@ fun AndroidKeyExchangeScreen(
     } else {
         val readyQr = currentQrResult
         if (readyQr == null) {
-            // Simple placeholder while QR is being prepared
+            // Show loading state while QR is being prepared
             KeyExchangeScreen(
                 deviceId = deviceId,
                 qrCodePayloads = emptyList(),
                 displayUrl = "",
+                isLoading = true,
                 onCopyUrl = { _ -> },
                 onShareUrl = { _ -> },
                 trustedPeers = trustedPeers,
@@ -466,6 +477,7 @@ fun AndroidKeyExchangeScreen(
                 deviceId = deviceId,
                 qrCodePayloads = readyQr.payloads,
                 displayUrl = "$TRCKY_ORG_BASE_URL/${readyQr.shortId}",
+                isLoading = false,
                 onCopyUrl = { url ->
                     val clipboard = localContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("url", url))

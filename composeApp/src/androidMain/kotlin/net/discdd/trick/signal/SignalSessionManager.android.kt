@@ -263,8 +263,8 @@ actual class SignalSessionManager(
                     // First try as regular SignalMessage
                     val signalMessage = SignalMessage(ciphertext)
                     sessionCipher.decrypt(signalMessage)
-                } catch (_: Exception) {
-                    // Try as PreKeySignalMessage
+                } catch (e: InvalidMessageException) {
+                    // Try as PreKeySignalMessage if SignalMessage parsing failed
                     try {
                         val preKeyMessage = PreKeySignalMessage(ciphertext)
                         sessionCipher.decrypt(preKeyMessage, UsePqRatchet.YES)

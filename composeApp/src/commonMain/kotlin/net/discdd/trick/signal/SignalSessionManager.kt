@@ -57,9 +57,34 @@ data class PreKeyBundleData(
         if (other !is PreKeyBundleData) return false
         return registrationId == other.registrationId &&
                deviceId == other.deviceId &&
-               preKeyId == other.preKeyId
+               preKeyId == other.preKeyId &&
+               (preKeyPublic == null && other.preKeyPublic == null || 
+                preKeyPublic != null && other.preKeyPublic != null && preKeyPublic.contentEquals(other.preKeyPublic)) &&
+               signedPreKeyId == other.signedPreKeyId &&
+               signedPreKeyPublic.contentEquals(other.signedPreKeyPublic) &&
+               signedPreKeySignature.contentEquals(other.signedPreKeySignature) &&
+               identityKey.contentEquals(other.identityKey) &&
+               kyberPreKeyId == other.kyberPreKeyId &&
+               (kyberPreKeyPublic == null && other.kyberPreKeyPublic == null || 
+                kyberPreKeyPublic != null && other.kyberPreKeyPublic != null && kyberPreKeyPublic.contentEquals(other.kyberPreKeyPublic)) &&
+               (kyberPreKeySignature == null && other.kyberPreKeySignature == null || 
+                kyberPreKeySignature != null && other.kyberPreKeySignature != null && kyberPreKeySignature.contentEquals(other.kyberPreKeySignature))
     }
-    override fun hashCode(): Int = registrationId.hashCode()
+    
+    override fun hashCode(): Int {
+        var result = registrationId
+        result = 31 * result + deviceId
+        result = 31 * result + (preKeyId ?: 0)
+        result = 31 * result + (preKeyPublic?.contentHashCode() ?: 0)
+        result = 31 * result + signedPreKeyId
+        result = 31 * result + signedPreKeyPublic.contentHashCode()
+        result = 31 * result + signedPreKeySignature.contentHashCode()
+        result = 31 * result + identityKey.contentHashCode()
+        result = 31 * result + (kyberPreKeyId ?: 0)
+        result = 31 * result + (kyberPreKeyPublic?.contentHashCode() ?: 0)
+        result = 31 * result + (kyberPreKeySignature?.contentHashCode() ?: 0)
+        return result
+    }
 }
 
 /**

@@ -178,6 +178,7 @@ private fun CameraPreviewWithScanner(
 fun MultiQRScannerScreen(
     scannedParts: Int,
     totalParts: Int,
+    alreadyScannedChunkIds: Set<Int> = emptySet(),
     onQRCodeScanned: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -205,6 +206,7 @@ fun MultiQRScannerScreen(
                     MultiCameraPreviewWithScanner(
                         scannedParts = scannedParts,
                         totalParts = totalParts,
+                        alreadyScannedChunkIds = alreadyScannedChunkIds,
                         onQRCodeScanned = onQRCodeScanned
                     )
                 }
@@ -235,6 +237,7 @@ fun MultiQRScannerScreen(
 private fun MultiCameraPreviewWithScanner(
     scannedParts: Int,
     totalParts: Int,
+    alreadyScannedChunkIds: Set<Int> = emptySet(),
     onQRCodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -242,7 +245,22 @@ private fun MultiCameraPreviewWithScanner(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     // Track which chunks we've already scanned to avoid duplicates
-    var scannedChunkIds by remember { mutableStateOf(setOf<Int>()) }
+    // Initialize from parent state and keep synchronized
+    // Parent state is the source of truth - if parent resets, we reset too
+    var scannedChunkIds by remember { mutableStateOf(alreadyScannedChunkIds) }
+    
+    // Synchronize with parent state when it changes
+    // If parent state is smaller (reset case), use parent as source of truth
+    // Otherwise merge to preserve local updates that haven't been confirmed yet
+    LaunchedEffect(alreadyScannedChunkIds) {
+        scannedChunkIds = if (alreadyScannedChunkIds.size < scannedChunkIds.size) {
+            // Parent reset - use parent as source of truth
+            alreadyScannedChunkIds
+        } else {
+            // Parent added chunks - merge to preserve any local updates
+            scannedChunkIds union alreadyScannedChunkIds
+        }
+    }
 
     AndroidView(
         factory = { ctx ->

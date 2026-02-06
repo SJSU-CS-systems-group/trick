@@ -6,9 +6,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +28,7 @@ fun KeyExchangeScreen(
     deviceId: String,
     qrCodePayloads: List<String>,
     displayUrl: String,
+    isLoading: Boolean = false,
     onCopyUrl: (String) -> Unit,
     onShareUrl: (String) -> Unit,
     trustedPeers: List<String>,
@@ -79,7 +79,30 @@ fun KeyExchangeScreen(
                     )
 
                     // QR Code display with pagination for multiple codes
-                    if (qrCodePayloads.isNotEmpty()) {
+                    if (isLoading || qrCodePayloads.isEmpty()) {
+                        // Loading indicator while QR codes are being generated
+                        Box(
+                            modifier = Modifier
+                                .size(300.dp)
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Generating QR code...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
                         // QR code indicator (e.g., "1 of 2")
                         if (qrCodePayloads.size > 1) {
                             Text(
@@ -91,48 +114,64 @@ fun KeyExchangeScreen(
                         }
 
                         // QR code with navigation
-                        Row(
+                        Box(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
+                            contentAlignment = Alignment.Center
                         ) {
-                            // Previous button
-                            if (qrCodePayloads.size > 1) {
-                                IconButton(
-                                    onClick = {
-                                        currentQrIndex = (currentQrIndex - 1 + qrCodePayloads.size) % qrCodePayloads.size
-                                    },
-                                    enabled = qrCodePayloads.size > 1
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                        contentDescription = "Previous QR"
-                                    )
-                                }
-                            }
-
-                            // QR Code
-                            Box(
-                                modifier = Modifier
-                                    .size(300.dp)
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                QRCodeView(payload = qrCodePayloads[currentQrIndex])
-                            }
+                                // Previous button - always show when multiple QR codes
+                                if (qrCodePayloads.size > 1) {
+                                    IconButton(
+                                        onClick = {
+                                            currentQrIndex = (currentQrIndex - 1 + qrCodePayloads.size) % qrCodePayloads.size
+                                        },
+                                        enabled = qrCodePayloads.size > 1,
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.ArrowBack,
+                                            contentDescription = "Previous QR",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                } else {
+                                    // Spacer to maintain layout when only one QR code
+                                    Spacer(modifier = Modifier.width(48.dp))
+                                }
 
-                            // Next button
-                            if (qrCodePayloads.size > 1) {
-                                IconButton(
-                                    onClick = {
-                                        currentQrIndex = (currentQrIndex + 1) % qrCodePayloads.size
-                                    },
-                                    enabled = qrCodePayloads.size > 1
+                                // QR Code
+                                Box(
+                                    modifier = Modifier
+                                        .size(300.dp)
+                                        .padding(8.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = "Next QR"
-                                    )
+                                    QRCodeView(payload = qrCodePayloads[currentQrIndex])
+                                }
+
+                                // Next button - always show when multiple QR codes
+                                if (qrCodePayloads.size > 1) {
+                                    IconButton(
+                                        onClick = {
+                                            currentQrIndex = (currentQrIndex + 1) % qrCodePayloads.size
+                                        },
+                                        enabled = qrCodePayloads.size > 1,
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.ArrowForward,
+                                            contentDescription = "Next QR",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                } else {
+                                    // Spacer to maintain layout when only one QR code
+                                    Spacer(modifier = Modifier.width(48.dp))
                                 }
                             }
                         }

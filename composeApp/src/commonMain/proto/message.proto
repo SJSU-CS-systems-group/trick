@@ -42,7 +42,6 @@ message ChatMessage {
   // Encryption fields (optional for backward compatibility)
   optional bytes encrypted_content = 6;      // Encrypted serialized TextContent or PhotoContent
   optional string encryption_version = 7;    // Encryption version identifier: "signal-v1" or "hpke-v1"
-  optional bytes sender_public_key = 8;      // Sender's public key for verification (deprecated for signal-v1)
 
   // Signal protocol metadata (informational, for signal-v1 messages)
   optional int32 message_type = 9;           // CiphertextMessage type: 2=Whisper, 3=PreKey
