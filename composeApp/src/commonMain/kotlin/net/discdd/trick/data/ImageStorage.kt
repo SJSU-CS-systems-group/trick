@@ -7,4 +7,8 @@ package net.discdd.trick.data
 expect class ImageStorage {
     fun saveImage(data: ByteArray, filename: String): String
     fun loadImage(path: String): ByteArray?
+    
+    companion object {
+        fun create(context: Any): ImageStorage
+    }
 }

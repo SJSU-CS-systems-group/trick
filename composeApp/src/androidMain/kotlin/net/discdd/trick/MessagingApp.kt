@@ -19,7 +19,7 @@ class MessagingApp : Application() {
         val database = DatabaseProvider.getDatabase()
         val platformModule = module {
             single { NativeContactsManager(this@MessagingApp) }
-            single { ImageStorage(this@MessagingApp) }
+            single { ImageStorage.create(this@MessagingApp) }
             includes(androidModule())
         }
 
