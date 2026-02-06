@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,17 +36,22 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main contacts list screen - the home screen of the app.
- * Displays all contacts that have exchanged keys, sorted by last message timestamp.
+ * Displays contacts in two sections: Nearby (WiFi Aware connected) and All Contacts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsListScreen(
     onContactClick: (TrickContact) -> Unit,
     onAddContactClick: () -> Unit,
-    onTestMessagingClick: (() -> Unit)? = null,  // Temporary bypass for testing
+    connectedPeerIds: List<String> = emptyList(),
+    onTestMessagingClick: (() -> Unit)? = null,
     viewModel: ContactsListViewModel = koinViewModel()
 ) {
-    val contacts by viewModel.contacts.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(connectedPeerIds) {
+        viewModel.updateConnectedPeers(connectedPeerIds)
+    }
 
     Scaffold(
         topBar = {
@@ -92,15 +98,14 @@ fun ContactsListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (contacts.isEmpty()) {
-                // Empty state
+            if (uiState.isEmpty) {
                 EmptyContactsState(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                // Contacts list
-                ContactsList(
-                    contacts = contacts,
+                SectionedContactsList(
+                    nearbyContacts = uiState.nearbyContacts,
+                    allContacts = uiState.allContacts,
                     onContactClick = onContactClick,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -110,27 +115,54 @@ fun ContactsListScreen(
 }
 
 /**
- * Lazy list of contacts with dividers.
+ * Lazy list of contacts organized into Nearby and All Contacts sections.
  */
 @Composable
-private fun ContactsList(
-    contacts: List<TrickContact>,
+private fun SectionedContactsList(
+    nearbyContacts: List<TrickContact>,
+    allContacts: List<TrickContact>,
     onContactClick: (TrickContact) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier) {
-        items(
-            items = contacts,
-            key = { it.shortId }
-        ) { contact ->
-            ContactItem(
-                contact = contact,
-                onClick = { onContactClick(contact) }
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 80.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            )
+        // Nearby section (only if non-empty)
+        if (nearbyContacts.isNotEmpty()) {
+            item(key = "nearby_header") {
+                SectionHeader(title = "Nearby", count = nearbyContacts.size)
+            }
+            items(
+                items = nearbyContacts,
+                key = { "nearby_${it.shortId}" }
+            ) { contact ->
+                ContactItem(
+                    contact = contact,
+                    onClick = { onContactClick(contact) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 80.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        // All Contacts section (only if non-empty)
+        if (allContacts.isNotEmpty()) {
+            item(key = "all_header") {
+                SectionHeader(title = "All Contacts", count = allContacts.size)
+            }
+            items(
+                items = allContacts,
+                key = { "all_${it.shortId}" }
+            ) { contact ->
+                ContactItem(
+                    contact = contact,
+                    onClick = { onContactClick(contact) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 80.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            }
         }
     }
 }
@@ -171,4 +203,3 @@ private fun EmptyContactsState(
         )
     }
 }
-
