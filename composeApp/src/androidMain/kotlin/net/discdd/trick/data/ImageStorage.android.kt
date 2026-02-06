@@ -2,8 +2,11 @@ package net.discdd.trick.data
 
 import android.content.Context
 import java.io.File
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-actual class ImageStorage(private val context: Context) {
+actual class ImageStorage() : KoinComponent {
+    private val context: Context by inject()
     private val imageDir: File
         get() = File(context.filesDir, "trick_images").also { it.mkdirs() }
 
