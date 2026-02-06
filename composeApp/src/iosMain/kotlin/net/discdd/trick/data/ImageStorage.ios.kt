@@ -47,10 +47,4 @@ actual class ImageStorage {
         }
         return bytes
     }
-    
-    actual companion object {
-        actual fun create(context: Any): ImageStorage {
-            return ImageStorage()
-        }
-    }
 }

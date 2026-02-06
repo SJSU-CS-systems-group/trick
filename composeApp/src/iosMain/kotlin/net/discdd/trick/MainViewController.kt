@@ -18,7 +18,7 @@ fun MainViewController() = ComposeUIViewController {
         // Create platform-specific module with NativeContactsManager stub
         val platformModule = module {
             single { NativeContactsManager() }
-            single { ImageStorage.create(Unit) }
+            single { ImageStorage() }
         }
 
         initKoin(database, platformModule)
