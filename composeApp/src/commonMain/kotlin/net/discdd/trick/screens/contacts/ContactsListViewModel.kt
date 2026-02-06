@@ -49,17 +49,17 @@ class ContactsListViewModel(
     )
 
     /**
-     * UI state with contacts partitioned into nearby and all sections.
+     * UI state with contacts partitioned into connected and all sections.
      */
     val uiState: StateFlow<ContactsListUiState> = combine(
         contacts,
         _connectedPeerIds
     ) { allContacts, peerIds ->
-        val (nearby, others) = allContacts.partition { contact ->
+        val (connected, others) = allContacts.partition { contact ->
             contact.deviceId != null && contact.deviceId in peerIds
         }
         ContactsListUiState(
-            nearbyContacts = nearby,
+            connectedContacts = connected,
             allContacts = others
         )
     }.stateIn(

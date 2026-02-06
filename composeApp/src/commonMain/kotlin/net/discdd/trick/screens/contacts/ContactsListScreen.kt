@@ -12,12 +12,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,7 +34,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main contacts list screen - the home screen of the app.
- * Displays contacts in two sections: Nearby (WiFi Aware connected) and All Contacts.
+ * Displays contacts in two sections: Connected (WiFi Aware connected) and All Contacts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,18 +60,7 @@ fun ContactsListScreen(
                         style = MaterialTheme.typography.headlineMedium
                     )
                 },
-                actions = {
-                    // Temporary test button to bypass contacts and go directly to messaging
-                    if (onTestMessagingClick != null) {
-                        IconButton(onClick = onTestMessagingClick) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "Test Messaging",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
+                actions = {},
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -104,7 +91,7 @@ fun ContactsListScreen(
                 )
             } else {
                 SectionedContactsList(
-                    nearbyContacts = uiState.nearbyContacts,
+                    connectedContacts = uiState.connectedContacts,
                     allContacts = uiState.allContacts,
                     onContactClick = onContactClick,
                     modifier = Modifier.fillMaxSize()
@@ -115,24 +102,24 @@ fun ContactsListScreen(
 }
 
 /**
- * Lazy list of contacts organized into Nearby and All Contacts sections.
+ * Lazy list of contacts organized into Connected and All Contacts sections.
  */
 @Composable
 private fun SectionedContactsList(
-    nearbyContacts: List<TrickContact>,
+    connectedContacts: List<TrickContact>,
     allContacts: List<TrickContact>,
     onContactClick: (TrickContact) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier) {
-        // Nearby section (only if non-empty)
-        if (nearbyContacts.isNotEmpty()) {
-            item(key = "nearby_header") {
-                SectionHeader(title = "Nearby", count = nearbyContacts.size)
+        // Connected section (only if non-empty)
+        if (connectedContacts.isNotEmpty()) {
+            item(key = "connected_header") {
+                SectionHeader(title = "Connected")
             }
             items(
-                items = nearbyContacts,
-                key = { "nearby_${it.shortId}" }
+                items = connectedContacts,
+                key = { "connected_${it.shortId}" }
             ) { contact ->
                 ContactItem(
                     contact = contact,
@@ -148,7 +135,7 @@ private fun SectionedContactsList(
         // All Contacts section (only if non-empty)
         if (allContacts.isNotEmpty()) {
             item(key = "all_header") {
-                SectionHeader(title = "All Contacts", count = allContacts.size)
+                SectionHeader(title = "All Contacts")
             }
             items(
                 items = allContacts,
