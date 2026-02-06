@@ -1,5 +1,6 @@
-headers = LibSignalBridge.h
-headerFilter = LibSignalBridge.h
+headers = trick_signal_ffi.h
+headerFilter = trick_signal_ffi.h
 package = net.discdd.trick.libsignal.bridge
-compilerOpts = -I${projectDir}/../iosApp/SignalBridge/Sources/SignalBridge/include
-linkerOpts = -framework SignalBridge -framework LibSignalClient
+compilerOpts = -I${projectDir}/../../rust/trick-signal-ffi
+staticLibraries = libtrick_signal_ffi.a
+libraryPaths = ${projectDir}/../../rust/trick-signal-ffi/target/aarch64-apple-ios/release ${projectDir}/../../rust/trick-signal-ffi/target/aarch64-apple-ios-sim/release

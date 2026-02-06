@@ -66,8 +66,9 @@ private suspend fun generateQRCode(content: String, width: Int, height: Int): Bi
     }
 
     val hints = hashMapOf<EncodeHintType, Any>().apply {
-        // Use M (Medium) error correction - raw bytes are ~2000, well under M's 2,331 limit
-        put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M)
+        // Use L (Low) error correction to allow denser payloads (Kyber + Signal bundle)
+        // while still remaining robust at 1024x1024 resolution.
+        put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
         put(EncodeHintType.MARGIN, 1)
         // Force byte mode with ISO-8859-1 for raw protobuf bytes
         put(EncodeHintType.CHARACTER_SET, "ISO-8859-1")

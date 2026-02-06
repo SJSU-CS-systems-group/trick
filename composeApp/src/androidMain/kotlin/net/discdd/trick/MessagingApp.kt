@@ -3,6 +3,7 @@ package net.discdd.trick
 import android.app.Application
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.data.DatabaseProvider
+import net.discdd.trick.data.ImageStorage
 import net.discdd.trick.di.androidModule
 import net.discdd.trick.di.initKoin
 import org.koin.dsl.module
@@ -18,8 +19,8 @@ class MessagingApp : Application() {
         val database = DatabaseProvider.getDatabase()
         val platformModule = module {
             single { NativeContactsManager(this@MessagingApp) }
-            // Include Signal protocol components
-            includes(androidModule(this@MessagingApp))
+            single { ImageStorage.create(this@MessagingApp) }
+            includes(androidModule())
         }
 
         // Initialize Koin with database and platform module

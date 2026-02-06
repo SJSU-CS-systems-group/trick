@@ -14,14 +14,42 @@ This document outlines the development rules and best practices for working on t
 - **Use Kotlin Coroutines and Flow** for asynchronous operations (works across all platforms)
 
 ### 2. Signal Protocol (Double Ratchet)
-- **Always use the Rust-based Signal Protocol library** (libsignal) for end-to-end encryption
-- Use the `expect/actual` pattern for Signal Protocol integration:
-  - Define common interface in `commonMain/kotlin/net/discdd/trick/libsignal/LibSignal.kt`
-  - Provide platform-specific implementations:
-    - Android: Use `org.signal.libsignal.protocol.*` classes
-    - iOS: Use LibSignalClient via C interop bridge
-- **Never implement custom encryption** - Always delegate to the official Signal Protocol library
+
+#### Architecture Overview
+- **Rust FFI Layer**: All Signal Protocol operations go through a unified Rust FFI layer (`rust/trick-signal-ffi`)
+- **Official Library**: Uses the official Signal Protocol library (libsignal) from `https://github.com/signalapp/libsignal` version **v0.86.7**
+- **Cross-Platform Bridge**: Single Rust codebase with platform-specific FFI bindings:
+  - **Android**: JNI bridge (`SignalNativeBridge.android.kt`) → `libtrick_signal_ffi.so`
+  - **iOS**: C interop bridge (`SignalNativeBridge.ios.kt`) → `libtrick_signal_ffi.a`
+- **Common Interface**: `SignalNativeBridge` (expect object) in `commonMain` provides unified API
+- **Wrapper Layer**: `LibSignalManager` in `commonMain` delegates to `SignalNativeBridge` for both platforms
+
+#### Key Components
+- **Rust Crate**: `rust/trick-signal-ffi/` wraps `libsignal-protocol` and `libsignal-core` v0.86.7
+- **Platform Bridges**:
+  - Android: `composeApp/src/androidMain/kotlin/net/discdd/trick/signal/SignalNativeBridge.android.kt`
+  - iOS: `composeApp/src/iosMain/kotlin/net/discdd/trick/signal/SignalNativeBridge.ios.kt`
+- **Common API**: `composeApp/src/commonMain/kotlin/net/discdd/trick/signal/SignalNativeBridge.kt` (expect)
+- **Session Management**: `SignalSessionManager` handles all Signal Protocol operations
+
+#### Protocol Requirements
+- **Kyber Post-Quantum Cryptography**: Required (libsignal 0.86.7+ mandates Kyber prekeys)
+- **Double Ratchet**: Automatic forward secrecy via session ratcheting
+- **X3DH Key Agreement**: Used for initial session establishment
+- **All cryptographic operations** must go through `SignalNativeBridge` - never implement custom crypto
+
+#### Building the Rust Library
+- **Android**: Run `./gradlew buildRustAndroid` or `rust/trick-signal-ffi/build-android.sh`
+  - Outputs: `libtrick_signal_ffi.so` to `composeApp/src/androidMain/jniLibs/`
+- **iOS**: Run `rust/trick-signal-ffi/build-ios.sh`
+  - Outputs: XCFramework and static libraries for iOS targets
+- **JNI Functions**: Defined in `rust/trick-signal-ffi/src/jni_bridge.rs` (Android only)
+- **C FFI Functions**: Defined in `rust/trick-signal-ffi/src/ffi.rs` (iOS/Android)
+
+#### Testing
 - **Test encryption/decryption on both platforms** after any Signal Protocol changes
+- **Verify Kyber prekey generation** and inclusion in PreKey bundles
+- **Test session establishment** via QR code key exchange
 
 ### 3. Architecture Patterns
 
@@ -49,16 +77,29 @@ This document outlines the development rules and best practices for working on t
 
 #### File Structure
 ```
-composeApp/src/
-├── commonMain/
-│   ├── kotlin/           # Shared business logic
-│   ├── sqldelight/       # Database schemas
-│   └── composeResources/ # Shared resources
-├── androidMain/
-│   ├── kotlin/           # Android-specific implementations
-│   └── res/              # Android resources
-└── iosMain/
-    └── kotlin/           # iOS-specific implementations
+trick/
+├── composeApp/src/
+│   ├── commonMain/
+│   │   ├── kotlin/           # Shared business logic
+│   │   ├── sqldelight/       # Database schemas
+│   │   └── composeResources/ # Shared resources
+│   ├── androidMain/
+│   │   ├── kotlin/           # Android-specific implementations
+│   │   ├── jniLibs/          # Native libraries (libtrick_signal_ffi.so)
+│   │   └── res/              # Android resources
+│   ├── iosMain/
+│   │   └── kotlin/           # iOS-specific implementations
+│   └── nativeInterop/
+│       └── cinterop/          # C interop definitions (libsignal.def)
+└── rust/
+    └── trick-signal-ffi/     # Rust FFI crate wrapping libsignal
+        ├── src/
+        │   ├── jni_bridge.rs  # JNI functions for Android
+        │   ├── ffi.rs         # C FFI functions for iOS
+        │   ├── ops.rs         # Core Signal Protocol operations
+        │   └── stores.rs      # In-memory store implementations
+        ├── build-android.sh   # Android build script
+        └── build-ios.sh       # iOS build script
 ```
 
 #### Naming Conventions
@@ -162,6 +203,13 @@ actual class PlatformFeature {
 - Keep versions in `gradle/libs.versions.toml` for consistency
 - **Avoid transitive platform-specific dependencies** in common code
 
+#### Rust Dependencies
+- **Signal Protocol**: `libsignal-protocol` and `libsignal-core` v0.86.7 from `https://github.com/signalapp/libsignal`
+- **JNI**: `jni` crate v0.21 (Android only, for JNI bridge)
+- **Build Tools**: `cbindgen` v0.27 (for C header generation)
+- **Rust Version**: 1.85+ required
+- **Cargo Dependencies**: Defined in `rust/trick-signal-ffi/Cargo.toml`
+
 ### 14. Code Quality
 
 - **Write self-documenting code** with clear function and variable names
@@ -183,19 +231,34 @@ actual class PlatformFeature {
    - Use Kotlin standard library or multiplatform libraries
 
 2. **Don't implement custom encryption**
-   - Always use Signal Protocol library
+   - Always use Signal Protocol via `SignalNativeBridge` (Rust FFI)
+   - Never bypass the Rust FFI layer for cryptographic operations
 
-3. **Don't use platform-specific DI frameworks**
+3. **Don't forget to build the Rust library**
+   - Android: Run `./gradlew buildRustAndroid` before building the app
+   - iOS: Run `rust/trick-signal-ffi/build-ios.sh` before building
+   - The native libraries are not auto-built during Gradle build
+
+4. **Don't use platform-specific DI frameworks**
    - Use Koin for multiplatform DI
 
-4. **Don't put platform-specific code in commonMain**
+5. **Don't put platform-specific code in commonMain**
    - Use expect/actual pattern
+   - `SignalNativeBridge` is expect/actual, but `LibSignalManager` is common
 
-5. **Don't use blocking I/O**
+6. **Don't use blocking I/O**
    - Use coroutines and suspend functions
 
-6. **Don't expose platform-specific types in common interfaces**
+7. **Don't expose platform-specific types in common interfaces**
    - Use multiplatform types or create common abstractions
+
+8. **Don't forget Kyber prekeys**
+   - libsignal 0.86.7+ requires Kyber post-quantum prekeys
+   - Always include `kyberPreKeyId`, `kyberPreKeyPublic`, and `kyberPreKeySignature` in PreKey bundles
+
+9. **Don't modify Rust FFI signatures without updating both platforms**
+   - Changes to `SignalNativeBridge` expect declaration require updates to both Android and iOS implementations
+   - Changes to Rust FFI functions require updating both JNI bridge (Android) and C FFI (iOS)
 
 ## Quick Reference
 
@@ -212,6 +275,26 @@ actual class PlatformFeature {
 2. Add to `gradle/libs.versions.toml`
 3. Add to appropriate source set in `build.gradle.kts`
 4. Update this document if it's a significant architectural change
+
+### Building the Rust FFI Library
+
+#### Android
+```bash
+# Option 1: Use Gradle task
+./gradlew buildRustAndroid
+
+# Option 2: Use build script directly
+cd rust/trick-signal-ffi
+./build-android.sh
+```
+
+#### iOS
+```bash
+cd rust/trick-signal-ffi
+./build-ios.sh
+```
+
+**Note**: The Rust library must be built before running the app. The native libraries are not automatically built during Gradle build (by design, to avoid requiring Rust toolchain for all developers).
 
 ### Modifying Database Schema
 

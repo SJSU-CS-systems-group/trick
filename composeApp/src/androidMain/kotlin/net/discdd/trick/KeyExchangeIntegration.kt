@@ -79,11 +79,18 @@ private fun createKeyExchangeBundle(
  * Splits data into multiple QR codes for easier scanning.
  *
  * Each chunk format: [part_number (1 byte), total_parts (1 byte), ...data...]
- * Target: ~1000 bytes per QR -> Version 17-18 with M error correction (~85 modules)
+ * Target: <= ~1900 bytes for a single QR (when possible) with L/M error correction.
+ *
+ * We always cap at **two** QR codes:
+ * - If the full protobuf fits comfortably in a single QR, use 1 part.
+ * - Otherwise, split into exactly 2 parts of (roughly) equal size.
  *
  * Returns list of ISO-8859-1 encoded strings (1:1 byte mapping) for ZXing byte mode.
  */
-private const val QR_CHUNK_SIZE = 1000 // bytes per QR code (excluding 2-byte header)
+// Conservative capacity for a single QR in byte mode with ErrorCorrectionLevel.L.
+// Version 40-L can hold up to 2,953 bytes; we stay well under that for robustness.
+private const val TARGET_SINGLE_QR_BYTES = 1900
+private const val MAX_QR_PARTS = 2
 
 private fun encodePayloadForQR(
     deviceId: String,
@@ -103,11 +110,33 @@ private fun encodePayloadForQR(
     )
 
     val protoBytes = protoBundle.encode()
-    Log.d("KeyExchange", "Protobuf size: ${protoBytes.size} bytes, splitting into QR chunks")
+    val totalSize = protoBytes.size
+    Log.d("KeyExchange", "Protobuf size: $totalSize bytes (before QR chunking)")
 
-    // Split into chunks
-    val chunks = protoBytes.toList().chunked(QR_CHUNK_SIZE)
-    val totalParts = chunks.size
+    // Decide how many QR parts we need (1 or 2), and corresponding chunk size.
+    val (chunks, totalParts) = if (totalSize <= TARGET_SINGLE_QR_BYTES) {
+        // Single QR: no real chunking needed, but keep the same header format for compatibility.
+        listOf(protoBytes.toList()) to 1
+    } else {
+        // Two-part QR: split as evenly as possible into at most MAX_QR_PARTS parts.
+        val partCount = MAX_QR_PARTS
+        val chunkSize = (totalSize + partCount - 1) / partCount // ceil(totalSize / partCount)
+        val splitChunks = protoBytes.toList().chunked(chunkSize)
+
+        // Safety: if for some reason we produced more than MAX_QR_PARTS chunks (shouldn't happen),
+        // merge the extras into the last chunk to keep totalParts <= MAX_QR_PARTS.
+        val normalizedChunks = if (splitChunks.size <= MAX_QR_PARTS) {
+            splitChunks
+        } else {
+            val head = splitChunks.take(MAX_QR_PARTS - 1)
+            val tailMerged = splitChunks.drop(MAX_QR_PARTS - 1).flatten()
+            head + listOf(tailMerged)
+        }
+
+        normalizedChunks to normalizedChunks.size
+    }
+
+    Log.d("KeyExchange", "Encoding into $totalParts QR part(s)")
 
     return chunks.mapIndexed { index, chunk ->
         val partNumber = index + 1
@@ -143,11 +172,21 @@ private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyExchangePayload,
         publicKeyHex = bundle.public_key.toByteArray().toHexString(),
         timestamp = bundle.timestamp,
         signatureHex = bundle.signature.toByteArray().toHexString(),
-        shortId = bundle.short_id,
-        signalPreKeyBundleJson = null // Not used in protobuf format
+        shortId = bundle.short_id
     )
 
     // Extract Signal prekey bundle data
+    // Validate required Kyber fields (libsignal 0.86.7+ requires Kyber post-quantum prekeys)
+    require(bundle.kyber_prekey_id >= 0) {
+        "Bundle missing required Kyber prekey ID. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    require(bundle.kyber_prekey_public.size > 0) {
+        "Bundle missing required Kyber prekey public key. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    require(bundle.kyber_prekey_signature.size > 0) {
+        "Bundle missing required Kyber prekey signature. Kyber post-quantum cryptography is required (libsignal 0.86.7+)."
+    }
+    
     val preKeyBundleData = PreKeyBundleData(
         registrationId = bundle.registration_id,
         deviceId = bundle.signal_device_id,
