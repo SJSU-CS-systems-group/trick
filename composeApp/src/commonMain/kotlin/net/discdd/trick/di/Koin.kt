@@ -46,6 +46,10 @@ fun initKoin(database: TrickDatabase? = null, platformModule: Module? = null) {
                     single<MessageMetadataRepository> { MessageMetadataRepositoryImpl(get()) }
                     single<MessageRepository> { MessageRepositoryImpl(get()) }
 
+                    // Provide Signal components
+                    single { SecureKeyStorage() }
+                    single { SignalSessionManager(get(), get()) }
+
                     // Provide MessagePersistenceManager
                     single {
                         MessagePersistenceManager(

@@ -12,13 +12,9 @@ use crate::error::*;
 use crate::ops;
 
 /// Helper: write bytes into a caller-provided output buffer.
-/// Returns bytes written, TRICK_ERROR_INVALID_ARGUMENT if out is null,
-/// or TRICK_ERROR_BUFFER_TOO_SMALL if capacity is insufficient.
+/// Returns bytes written, or TRICK_ERROR_BUFFER_TOO_SMALL.
 unsafe fn write_output(data: &[u8], out: *mut u8, cap: i32) -> i32 {
-    if out.is_null() {
-        return TRICK_ERROR_INVALID_ARGUMENT;
-    }
-    if cap < data.len() as i32 {
+    if out.is_null() || cap < data.len() as i32 {
         return TRICK_ERROR_BUFFER_TOO_SMALL;
     }
     std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len());
@@ -370,8 +366,9 @@ pub unsafe extern "C" fn trick_decrypt_message(
     let addr = match read_cstr(address_name) {
         Ok(s) => s, Err(e) => return e,
     };
-    // session_record is optional: empty/null is valid for first-contact PreKeySignalMessage decrypts
-    let sess = read_bytes(session_record, session_record_len).unwrap_or(&[]);
+    let sess = match require_bytes(session_record, session_record_len) {
+        Ok(b) => b, Err(e) => return e,
+    };
     let ct = match require_bytes(ciphertext, ciphertext_len) {
         Ok(b) => b, Err(e) => return e,
     };

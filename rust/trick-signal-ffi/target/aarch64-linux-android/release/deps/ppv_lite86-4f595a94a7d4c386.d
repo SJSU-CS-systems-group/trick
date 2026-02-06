@@ -1,0 +1,10 @@
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/aarch64-linux-android/release/deps/ppv_lite86-4f595a94a7d4c386.d: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/aarch64-linux-android/release/deps/libppv_lite86-4f595a94a7d4c386.rlib: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/ronaldli/Desktop/DDD/trick/rust/trick-signal-ffi/target/aarch64-linux-android/release/deps/libppv_lite86-4f595a94a7d4c386.rmeta: /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs:
+/Users/ronaldli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs:

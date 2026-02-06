@@ -11,350 +11,6 @@ import net.discdd.trick.libsignal.bridge.*
  */
 actual object SignalNativeBridge {
 
-    /**
-     * Safely gets a pointer from a ByteArray, handling empty arrays by returning null.
-     * Empty arrays cannot use addressOf(0) as it will crash.
-     */
-    private inline fun <T> ByteArray.usePinnedSafe(block: (CPointer<ByteVar>?, Int) -> T): T {
-        return if (this.isEmpty()) {
-            block(null, 0)
-        } else {
-            this.usePinned { pinned ->
-                block(pinned.addressOf(0).reinterpret(), this.size)
-            }
-        }
-    }
-
-    /**
-     * Safely gets a pointer from a nullable ByteArray, handling both null and empty arrays.
-     * Returns null pointer with length 0 for null or empty arrays.
-     */
-    private inline fun <T> ByteArray?.usePinnedSafeNullable(block: (CPointer<ByteVar>?, Int) -> T): T {
-        return when {
-            this == null -> block(null, 0)
-            this.isEmpty() -> block(null, 0)
-            else -> this.usePinned { pinned ->
-                block(pinned.addressOf(0).reinterpret(), this.size)
-            }
-        }
-    }
-
-    /**
-     * Helper function to conditionally pin 3 nullable ByteArrays and execute a lambda with all pointers.
-     * This ensures all memory remains pinned simultaneously for the duration of the native call.
-     * Handles both null and empty arrays safely.
-     */
-    private inline fun <T> withNullablePinned3(
-        existingPeerIdentity: ByteArray?,
-        existingSession: ByteArray?,
-        preKeyPublic: ByteArray?,
-        block: (
-            existPeerPtr: CPointer<ByteVar>?,
-            existPeerLen: Int,
-            existSessPtr: CPointer<ByteVar>?,
-            existSessLen: Int,
-            bPkPtr: CPointer<ByteVar>?,
-            bPkLen: Int
-        ) -> T
-    ): T {
-        // Helper to check if array is non-null and non-empty
-        fun ByteArray?.isNotEmpty(): Boolean = this != null && !this.isEmpty()
-        
-        return when {
-            existingPeerIdentity.isNotEmpty() && existingSession.isNotEmpty() && preKeyPublic.isNotEmpty() -> {
-                existingPeerIdentity!!.usePinned { existPeer ->
-                    existingSession!!.usePinned { existSess ->
-                        preKeyPublic!!.usePinned { bPk ->
-                            block(
-                                existPeer.addressOf(0).reinterpret(), existingPeerIdentity.size,
-                                existSess.addressOf(0).reinterpret(), existingSession.size,
-                                bPk.addressOf(0).reinterpret(), preKeyPublic.size
-                            )
-                        }
-                    }
-                }
-            }
-            existingPeerIdentity.isNotEmpty() && existingSession.isNotEmpty() -> {
-                existingPeerIdentity!!.usePinned { existPeer ->
-                    existingSession!!.usePinned { existSess ->
-                        block(
-                            existPeer.addressOf(0).reinterpret(), existingPeerIdentity.size,
-                            existSess.addressOf(0).reinterpret(), existingSession.size,
-                            null, 0
-                        )
-                    }
-                }
-            }
-            existingPeerIdentity.isNotEmpty() && preKeyPublic.isNotEmpty() -> {
-                existingPeerIdentity!!.usePinned { existPeer ->
-                    preKeyPublic!!.usePinned { bPk ->
-                        block(
-                            existPeer.addressOf(0).reinterpret(), existingPeerIdentity.size,
-                            null, 0,
-                            bPk.addressOf(0).reinterpret(), preKeyPublic.size
-                        )
-                    }
-                }
-            }
-            existingSession.isNotEmpty() && preKeyPublic.isNotEmpty() -> {
-                existingSession!!.usePinned { existSess ->
-                    preKeyPublic!!.usePinned { bPk ->
-                        block(
-                            null, 0,
-                            existSess.addressOf(0).reinterpret(), existingSession.size,
-                            bPk.addressOf(0).reinterpret(), preKeyPublic.size
-                        )
-                    }
-                }
-            }
-            existingPeerIdentity.isNotEmpty() -> {
-                existingPeerIdentity!!.usePinned { existPeer ->
-                    block(
-                        existPeer.addressOf(0).reinterpret(), existingPeerIdentity.size,
-                        null, 0,
-                        null, 0
-                    )
-                }
-            }
-            existingSession.isNotEmpty() -> {
-                existingSession!!.usePinned { existSess ->
-                    block(
-                        null, 0,
-                        existSess.addressOf(0).reinterpret(), existingSession.size,
-                        null, 0
-                    )
-                }
-            }
-            preKeyPublic.isNotEmpty() -> {
-                preKeyPublic!!.usePinned { bPk ->
-                    block(
-                        null, 0,
-                        null, 0,
-                        bPk.addressOf(0).reinterpret(), preKeyPublic.size
-                    )
-                }
-            }
-            else -> {
-                block(null, 0, null, 0, null, 0)
-            }
-        }
-    }
-
-    /**
-     * Helper function to conditionally pin multiple nullable ByteArrays and execute a lambda with all pointers.
-     * This ensures all memory remains pinned simultaneously for the duration of the native call.
-     * Handles both null and empty arrays safely.
-     */
-    private inline fun <T> withNullablePinned(
-        peerIdentity: ByteArray?,
-        preKeyRecord: ByteArray?,
-        signedPreKeyRecord: ByteArray?,
-        kyberPreKeyRecord: ByteArray?,
-        block: (
-            peerPtr: CPointer<ByteVar>?,
-            peerLen: Int,
-            pkPtr: CPointer<ByteVar>?,
-            pkLen: Int,
-            spkPtr: CPointer<ByteVar>?,
-            spkLen: Int,
-            kpkPtr: CPointer<ByteVar>?,
-            kpkLen: Int
-        ) -> T
-    ): T {
-        // Helper to check if array is non-null and non-empty
-        fun ByteArray?.isNotEmpty(): Boolean = this != null && !this.isEmpty()
-        
-        return when {
-            peerIdentity.isNotEmpty() && preKeyRecord.isNotEmpty() && signedPreKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                peerIdentity.usePinned { peer ->
-                    preKeyRecord.usePinned { pk ->
-                        signedPreKeyRecord.usePinned { spk ->
-                            kyberPreKeyRecord.usePinned { kpk ->
-                                block(
-                                    peer.addressOf(0).reinterpret(), peerIdentity.size,
-                                    pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                                    spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                                    kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && preKeyRecord.isNotEmpty() && signedPreKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    preKeyRecord!!.usePinned { pk ->
-                        signedPreKeyRecord!!.usePinned { spk ->
-                            block(
-                                peer.addressOf(0).reinterpret(), peerIdentity.size,
-                                pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                                spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                                null, 0
-                            )
-                        }
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && preKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    preKeyRecord!!.usePinned { pk ->
-                        kyberPreKeyRecord!!.usePinned { kpk ->
-                            block(
-                                peer.addressOf(0).reinterpret(), peerIdentity.size,
-                                pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                                null, 0,
-                                kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                            )
-                        }
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && signedPreKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    signedPreKeyRecord!!.usePinned { spk ->
-                        kyberPreKeyRecord!!.usePinned { kpk ->
-                            block(
-                                peer.addressOf(0).reinterpret(), peerIdentity.size,
-                                null, 0,
-                                spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                                kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                            )
-                        }
-                    }
-                }
-            }
-            preKeyRecord.isNotEmpty() && signedPreKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                preKeyRecord!!.usePinned { pk ->
-                    signedPreKeyRecord!!.usePinned { spk ->
-                        kyberPreKeyRecord!!.usePinned { kpk ->
-                            block(
-                                null, 0,
-                                pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                                spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                                kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                            )
-                        }
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && preKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    preKeyRecord!!.usePinned { pk ->
-                        block(
-                            peer.addressOf(0).reinterpret(), peerIdentity.size,
-                            pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                            null, 0,
-                            null, 0
-                        )
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && signedPreKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    signedPreKeyRecord!!.usePinned { spk ->
-                        block(
-                            peer.addressOf(0).reinterpret(), peerIdentity.size,
-                            null, 0,
-                            spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                            null, 0
-                        )
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    kyberPreKeyRecord!!.usePinned { kpk ->
-                        block(
-                            peer.addressOf(0).reinterpret(), peerIdentity.size,
-                            null, 0,
-                            null, 0,
-                            kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                        )
-                    }
-                }
-            }
-            preKeyRecord.isNotEmpty() && signedPreKeyRecord.isNotEmpty() -> {
-                preKeyRecord!!.usePinned { pk ->
-                    signedPreKeyRecord!!.usePinned { spk ->
-                        block(
-                            null, 0,
-                            pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                            spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                            null, 0
-                        )
-                    }
-                }
-            }
-            preKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                preKeyRecord!!.usePinned { pk ->
-                    kyberPreKeyRecord!!.usePinned { kpk ->
-                        block(
-                            null, 0,
-                            pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                            null, 0,
-                            kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                        )
-                    }
-                }
-            }
-            signedPreKeyRecord.isNotEmpty() && kyberPreKeyRecord.isNotEmpty() -> {
-                signedPreKeyRecord!!.usePinned { spk ->
-                    kyberPreKeyRecord!!.usePinned { kpk ->
-                        block(
-                            null, 0,
-                            null, 0,
-                            spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                            kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                        )
-                    }
-                }
-            }
-            peerIdentity.isNotEmpty() -> {
-                peerIdentity!!.usePinned { peer ->
-                    block(
-                        peer.addressOf(0).reinterpret(), peerIdentity.size,
-                        null, 0,
-                        null, 0,
-                        null, 0
-                    )
-                }
-            }
-            preKeyRecord.isNotEmpty() -> {
-                preKeyRecord!!.usePinned { pk ->
-                    block(
-                        null, 0,
-                        pk.addressOf(0).reinterpret(), preKeyRecord.size,
-                        null, 0,
-                        null, 0
-                    )
-                }
-            }
-            signedPreKeyRecord.isNotEmpty() -> {
-                signedPreKeyRecord!!.usePinned { spk ->
-                    block(
-                        null, 0,
-                        null, 0,
-                        spk.addressOf(0).reinterpret(), signedPreKeyRecord.size,
-                        null, 0
-                    )
-                }
-            }
-            kyberPreKeyRecord.isNotEmpty() -> {
-                kyberPreKeyRecord!!.usePinned { kpk ->
-                    block(
-                        null, 0,
-                        null, 0,
-                        null, 0,
-                        kpk.addressOf(0).reinterpret(), kyberPreKeyRecord.size
-                    )
-                }
-            }
-            else -> {
-                block(null, 0, null, 0, null, 0, null, 0)
-            }
-        }
-    }
-
     // =========================================================================
     // Key Generation
     // =========================================================================
@@ -457,34 +113,35 @@ actual object SignalNativeBridge {
                             bundle.identityKey.usePinned { bIk ->
                                 bundle.kyberPreKeyPublic!!.usePinned { kpkPub ->
                                     bundle.kyberPreKeySignature!!.usePinned { kpkSig ->
-                                        // Pin nullable arrays for the duration of the native call
-                                        withNullablePinned3(
-                                            existingPeerIdentity,
-                                            existingSession,
-                                            bundle.preKeyPublic
-                                        ) { existPeerPtr, existPeerLen, existSessPtr, existSessLen, bPkPtr, bPkLen ->
-                                            trick_process_pre_key_bundle(
-                                                idPub.addressOf(0).reinterpret(), identityPublic.size,
-                                                idPriv.addressOf(0).reinterpret(), identityPrivate.size,
-                                                registrationId,
-                                                addressName.cstr.ptr,
-                                                deviceId,
-                                                existPeerPtr, existPeerLen,
-                                                existSessPtr, existSessLen,
-                                                bundle.registrationId, bundle.deviceId,
-                                                bundle.preKeyId ?: -1,
-                                                bPkPtr, bPkLen,
-                                                bundle.signedPreKeyId,
-                                                spkPub.addressOf(0).reinterpret(), bundle.signedPreKeyPublic.size,
-                                                spkSig.addressOf(0).reinterpret(), bundle.signedPreKeySignature.size,
-                                                bIk.addressOf(0).reinterpret(), bundle.identityKey.size,
-                                                bundle.kyberPreKeyId!!,
-                                                kpkPub.addressOf(0).reinterpret(), bundle.kyberPreKeyPublic!!.size,
-                                                kpkSig.addressOf(0).reinterpret(), bundle.kyberPreKeySignature!!.size,
-                                                sessPinned.addressOf(0).reinterpret(), 8192, outSessionLen.ptr,
-                                                outIdentityChanged.ptr
-                                            )
-                                        }
+                                        // Handle nullable arrays
+                                        val existPeerPtr = existingPeerIdentity?.usePinned { it.addressOf(0).reinterpret() }
+                                        val existPeerLen = existingPeerIdentity?.size ?: 0
+                                        val existSessPtr = existingSession?.usePinned { it.addressOf(0).reinterpret() }
+                                        val existSessLen = existingSession?.size ?: 0
+                                        val bPkPtr = bundle.preKeyPublic?.usePinned { it.addressOf(0).reinterpret() }
+                                        val bPkLen = bundle.preKeyPublic?.size ?: 0
+
+                                        trick_process_pre_key_bundle(
+                                            idPub.addressOf(0).reinterpret(), identityPublic.size,
+                                            idPriv.addressOf(0).reinterpret(), identityPrivate.size,
+                                            registrationId,
+                                            addressName.cstr.ptr,
+                                            deviceId,
+                                            existPeerPtr, existPeerLen,
+                                            existSessPtr, existSessLen,
+                                            bundle.registrationId, bundle.deviceId,
+                                            bundle.preKeyId ?: -1,
+                                            bPkPtr, bPkLen,
+                                            bundle.signedPreKeyId,
+                                            spkPub.addressOf(0).reinterpret(), bundle.signedPreKeyPublic.size,
+                                            spkSig.addressOf(0).reinterpret(), bundle.signedPreKeySignature.size,
+                                            bIk.addressOf(0).reinterpret(), bundle.identityKey.size,
+                                            bundle.kyberPreKeyId!!,
+                                            kpkPub.addressOf(0).reinterpret(), bundle.kyberPreKeyPublic!!.size,
+                                            kpkSig.addressOf(0).reinterpret(), bundle.kyberPreKeySignature!!.size,
+                                            sessPinned.addressOf(0).reinterpret(), 8192, outSessionLen.ptr,
+                                            outIdentityChanged.ptr
+                                        )
                                     }
                                 }
                             }
@@ -530,8 +187,12 @@ actual object SignalNativeBridge {
 
         val result = identityPublic.usePinned { idPub ->
             identityPrivate.usePinned { idPriv ->
+<<<<<<< HEAD
                 // Handle empty sessionRecord safely
                 sessionRecord.usePinnedSafe { sessPtr, sessLen ->
+=======
+                sessionRecord.usePinned { sess ->
+>>>>>>> e13ac59 (Full migration to Rust Libsignal via FFI for Android and iOS code unification)
                     peerIdentity.usePinned { peer ->
                         plaintext.usePinned { pt ->
                             outCiphertext.usePinned { ct ->
@@ -542,7 +203,7 @@ actual object SignalNativeBridge {
                                         registrationId,
                                         addressName.cstr.ptr,
                                         deviceId,
-                                        sessPtr, sessLen,
+                                        sess.addressOf(0).reinterpret(), sessionRecord.size,
                                         peer.addressOf(0).reinterpret(), peerIdentity.size,
                                         pt.addressOf(0).reinterpret(), plaintext.size,
                                         ct.addressOf(0).reinterpret(), outCiphertext.size, outCtLen.ptr,
@@ -590,26 +251,27 @@ actual object SignalNativeBridge {
 
         val result = identityPublic.usePinned { idPub ->
             identityPrivate.usePinned { idPriv ->
-                // Handle empty sessionRecord safely (can be empty for first-contact PreKey messages)
-                sessionRecord.usePinnedSafe { sessPtr, sessLen ->
+                sessionRecord.usePinned { sess ->
                     ciphertext.usePinned { ct ->
                         outPlaintext.usePinned { pt ->
                             outUpdatedSession.usePinned { updSess ->
                                 outSenderIdentity.usePinned { senderId ->
-                                    // Pin nullable arrays for the duration of the native call
-                                    withNullablePinned(
-                                        peerIdentity,
-                                        preKeyRecord,
-                                        signedPreKeyRecord,
-                                        kyberPreKeyRecord
-                                    ) { peerPtr, peerLen, pkPtr, pkLen, spkPtr, spkLen, kpkPtr, kpkLen ->
+                                    val peerPtr = peerIdentity?.usePinned { it.addressOf(0).reinterpret() }
+                                    val peerLen = peerIdentity?.size ?: 0
+                                    val pkPtr = preKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val pkLen = preKeyRecord?.size ?: 0
+                                    val spkPtr = signedPreKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val spkLen = signedPreKeyRecord?.size ?: 0
+                                    val kpkPtr = kyberPreKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val kpkLen = kyberPreKeyRecord?.size ?: 0
+
                                     trick_decrypt_message(
                                         idPub.addressOf(0).reinterpret(), identityPublic.size,
                                         idPriv.addressOf(0).reinterpret(), identityPrivate.size,
                                         registrationId,
                                         addressName.cstr.ptr,
                                         deviceId,
-                                        sessPtr, sessLen,
+                                        sess.addressOf(0).reinterpret(), sessionRecord.size,
                                         peerPtr, peerLen,
                                         pkPtr, pkLen,
                                         spkPtr, spkLen,
@@ -622,7 +284,6 @@ actual object SignalNativeBridge {
                                         outConsumedKpkId.ptr,
                                         senderId.addressOf(0).reinterpret(), 64, outIdLen.ptr
                                     )
-                                    }
                                 }
                             }
                         }
