@@ -5,6 +5,7 @@ package net.discdd.trick.signal
 import kotlinx.cinterop.*
 import platform.Foundation.NSData
 import platform.Foundation.NSMutableData
+import platform.Foundation.create
 import platform.Security.*
 import kotlin.random.Random
 
@@ -65,10 +66,10 @@ actual class SecureKeyStorage actual constructor() {
             kSecReturnData to true,
             kSecMatchLimit to kSecMatchLimitOne
         )
-        val result = alloc<ObjCObjectVar<Any?>>()
-        val status = SecItemCopyMatching(query as CFDictionaryRef, result.ptr)
+        val resultPtr = alloc<COpaquePointerVar>()
+        val status = SecItemCopyMatching(query as platform.CoreFoundation.CFDictionaryRef, resultPtr.ptr)
         if (status == errSecSuccess) {
-            val data = result.value as? NSData ?: return null
+            val data = resultPtr.value?.let { interpretObjCPointerOrNull<NSData>(it.rawValue) } ?: return null
             ByteArray(data.length.toInt()).also { bytes ->
                 data.bytes?.let { ptr ->
                     bytes.usePinned { pinned ->
@@ -82,7 +83,7 @@ actual class SecureKeyStorage actual constructor() {
     }
 
     private fun saveToKeychain(key: ByteArray) {
-        val keyData = key.usePinned { pinned ->
+        val keyData: NSData = key.usePinned { pinned ->
             NSData.create(bytes = pinned.addressOf(0), length = key.size.toULong())
         }
         val attrs = mapOf(
@@ -92,7 +93,7 @@ actual class SecureKeyStorage actual constructor() {
             kSecValueData to keyData,
             kSecAttrAccessible to kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         )
-        SecItemAdd(attrs as CFDictionaryRef, null)
+        SecItemAdd(attrs as platform.CoreFoundation.CFDictionaryRef, null)
     }
 
     // Simple AES-GCM implementation using CommonCrypto

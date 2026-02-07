@@ -100,7 +100,7 @@ actual object SignalNativeBridge {
         require(bundle.kyberPreKeySignature != null && bundle.kyberPreKeySignature!!.isNotEmpty()) {
             "Kyber prekey signature is required but was null or empty"
         }
-        
+
         val outSession = ByteArray(8192)
         val outIdentityChanged = alloc<IntVar>()
         val outSessionLen = alloc<IntVar>()
@@ -114,18 +114,18 @@ actual object SignalNativeBridge {
                                 bundle.kyberPreKeyPublic!!.usePinned { kpkPub ->
                                     bundle.kyberPreKeySignature!!.usePinned { kpkSig ->
                                         // Handle nullable arrays
-                                        val existPeerPtr = existingPeerIdentity?.usePinned { it.addressOf(0).reinterpret() }
+                                        val existPeerPtr = existingPeerIdentity?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                         val existPeerLen = existingPeerIdentity?.size ?: 0
-                                        val existSessPtr = existingSession?.usePinned { it.addressOf(0).reinterpret() }
+                                        val existSessPtr = existingSession?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                         val existSessLen = existingSession?.size ?: 0
-                                        val bPkPtr = bundle.preKeyPublic?.usePinned { it.addressOf(0).reinterpret() }
+                                        val bPkPtr = bundle.preKeyPublic?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                         val bPkLen = bundle.preKeyPublic?.size ?: 0
 
                                         trick_process_pre_key_bundle(
-                                            idPub.addressOf(0).reinterpret(), identityPublic.size,
-                                            idPriv.addressOf(0).reinterpret(), identityPrivate.size,
+                                            idPub.addressOf(0).reinterpret<UByteVar>(), identityPublic.size,
+                                            idPriv.addressOf(0).reinterpret<UByteVar>(), identityPrivate.size,
                                             registrationId,
-                                            addressName.cstr.ptr,
+                                            addressName,
                                             deviceId,
                                             existPeerPtr, existPeerLen,
                                             existSessPtr, existSessLen,
@@ -133,13 +133,13 @@ actual object SignalNativeBridge {
                                             bundle.preKeyId ?: -1,
                                             bPkPtr, bPkLen,
                                             bundle.signedPreKeyId,
-                                            spkPub.addressOf(0).reinterpret(), bundle.signedPreKeyPublic.size,
-                                            spkSig.addressOf(0).reinterpret(), bundle.signedPreKeySignature.size,
-                                            bIk.addressOf(0).reinterpret(), bundle.identityKey.size,
+                                            spkPub.addressOf(0).reinterpret<UByteVar>(), bundle.signedPreKeyPublic.size,
+                                            spkSig.addressOf(0).reinterpret<UByteVar>(), bundle.signedPreKeySignature.size,
+                                            bIk.addressOf(0).reinterpret<UByteVar>(), bundle.identityKey.size,
                                             bundle.kyberPreKeyId!!,
-                                            kpkPub.addressOf(0).reinterpret(), bundle.kyberPreKeyPublic!!.size,
-                                            kpkSig.addressOf(0).reinterpret(), bundle.kyberPreKeySignature!!.size,
-                                            sessPinned.addressOf(0).reinterpret(), 8192, outSessionLen.ptr,
+                                            kpkPub.addressOf(0).reinterpret<UByteVar>(), bundle.kyberPreKeyPublic!!.size,
+                                            kpkSig.addressOf(0).reinterpret<UByteVar>(), bundle.kyberPreKeySignature!!.size,
+                                            sessPinned.addressOf(0).reinterpret<UByteVar>(), 8192, outSessionLen.ptr,
                                             outIdentityChanged.ptr
                                         )
                                     }
@@ -193,17 +193,17 @@ actual object SignalNativeBridge {
                             outCiphertext.usePinned { ct ->
                                 outUpdatedSession.usePinned { updSess ->
                                     trick_encrypt_message(
-                                        idPub.addressOf(0).reinterpret(), identityPublic.size,
-                                        idPriv.addressOf(0).reinterpret(), identityPrivate.size,
+                                        idPub.addressOf(0).reinterpret<UByteVar>(), identityPublic.size,
+                                        idPriv.addressOf(0).reinterpret<UByteVar>(), identityPrivate.size,
                                         registrationId,
-                                        addressName.cstr.ptr,
+                                        addressName,
                                         deviceId,
-                                        sess.addressOf(0).reinterpret(), sessionRecord.size,
-                                        peer.addressOf(0).reinterpret(), peerIdentity.size,
-                                        pt.addressOf(0).reinterpret(), plaintext.size,
-                                        ct.addressOf(0).reinterpret(), outCiphertext.size, outCtLen.ptr,
+                                        sess.addressOf(0).reinterpret<UByteVar>(), sessionRecord.size,
+                                        peer.addressOf(0).reinterpret<UByteVar>(), peerIdentity.size,
+                                        pt.addressOf(0).reinterpret<UByteVar>(), plaintext.size,
+                                        ct.addressOf(0).reinterpret<UByteVar>(), outCiphertext.size, outCtLen.ptr,
                                         outMsgType.ptr,
-                                        updSess.addressOf(0).reinterpret(), 8192, outSessLen.ptr
+                                        updSess.addressOf(0).reinterpret<UByteVar>(), 8192, outSessLen.ptr
                                     )
                                 }
                             }
@@ -251,33 +251,33 @@ actual object SignalNativeBridge {
                         outPlaintext.usePinned { pt ->
                             outUpdatedSession.usePinned { updSess ->
                                 outSenderIdentity.usePinned { senderId ->
-                                    val peerPtr = peerIdentity?.usePinned { it.addressOf(0).reinterpret() }
+                                    val peerPtr = peerIdentity?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                     val peerLen = peerIdentity?.size ?: 0
-                                    val pkPtr = preKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val pkPtr = preKeyRecord?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                     val pkLen = preKeyRecord?.size ?: 0
-                                    val spkPtr = signedPreKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val spkPtr = signedPreKeyRecord?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                     val spkLen = signedPreKeyRecord?.size ?: 0
-                                    val kpkPtr = kyberPreKeyRecord?.usePinned { it.addressOf(0).reinterpret() }
+                                    val kpkPtr = kyberPreKeyRecord?.usePinned { it.addressOf(0).reinterpret<UByteVar>() }
                                     val kpkLen = kyberPreKeyRecord?.size ?: 0
 
                                     trick_decrypt_message(
-                                        idPub.addressOf(0).reinterpret(), identityPublic.size,
-                                        idPriv.addressOf(0).reinterpret(), identityPrivate.size,
+                                        idPub.addressOf(0).reinterpret<UByteVar>(), identityPublic.size,
+                                        idPriv.addressOf(0).reinterpret<UByteVar>(), identityPrivate.size,
                                         registrationId,
-                                        addressName.cstr.ptr,
+                                        addressName,
                                         deviceId,
-                                        sess.addressOf(0).reinterpret(), sessionRecord.size,
+                                        sess.addressOf(0).reinterpret<UByteVar>(), sessionRecord.size,
                                         peerPtr, peerLen,
                                         pkPtr, pkLen,
                                         spkPtr, spkLen,
                                         kpkPtr, kpkLen,
-                                        ct.addressOf(0).reinterpret(), ciphertext.size,
+                                        ct.addressOf(0).reinterpret<UByteVar>(), ciphertext.size,
                                         messageType,
-                                        pt.addressOf(0).reinterpret(), outPlaintext.size, outPtLen.ptr,
-                                        updSess.addressOf(0).reinterpret(), 8192, outSessLen.ptr,
+                                        pt.addressOf(0).reinterpret<UByteVar>(), outPlaintext.size, outPtLen.ptr,
+                                        updSess.addressOf(0).reinterpret<UByteVar>(), 8192, outSessLen.ptr,
                                         outConsumedPkId.ptr,
                                         outConsumedKpkId.ptr,
-                                        senderId.addressOf(0).reinterpret(), 64, outIdLen.ptr
+                                        senderId.addressOf(0).reinterpret<UByteVar>(), 64, outIdLen.ptr
                                     )
                                 }
                             }

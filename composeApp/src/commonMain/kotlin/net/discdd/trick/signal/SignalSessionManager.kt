@@ -656,7 +656,11 @@ class SignalSessionManager(
         // Use Rust for secure random via identity key pair generation side effect,
         // or just generate random bytes
         kotlin.random.Random.nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
+        return bytes.joinToString("") { byte ->
+            val unsignedByte = (byte.toInt() and 0xFF)
+            val hex = unsignedByte.toString(16)
+            if (hex.length == 1) "0$hex" else hex
+        }
     }
 
     /**

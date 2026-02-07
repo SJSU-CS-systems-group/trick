@@ -26,5 +26,14 @@ fun MainViewController() = ComposeUIViewController {
     }
 
     val wifiAwareService = WifiAwareServiceImpl()
-    App(wifiAwareService = wifiAwareService, permissionsGranted = true)
+    App(
+        wifiAwareService = wifiAwareService,
+        permissionsGranted = true,
+        keyExchangeContent = { deviceId, onNavigateBack ->
+            IOSKeyExchangeScreen(
+                deviceId = deviceId,
+                onNavigateBack = onNavigateBack
+            )
+        }
+    )
 }

@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
+import net.discdd.trick.navigation.KeyExchangeContent
 import net.discdd.trick.navigation.TrickNavHost
 import net.discdd.trick.screens.UnsupportedDeviceScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
@@ -15,7 +16,8 @@ import net.discdd.trick.screens.messaging.WifiAwareService
 fun App(
     wifiAwareService: WifiAwareService,
     permissionsGranted: Boolean = false,
-    wifiAwareSupported: Boolean = true
+    wifiAwareSupported: Boolean = true,
+    keyExchangeContent: KeyExchangeContent? = null
 ) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
@@ -31,7 +33,7 @@ fun App(
                 wifiAwareService = wifiAwareService,
                 permissionsGranted = permissionsGranted,
                 onPickImage = null,
-                keyExchangeContent = null
+                keyExchangeContent = keyExchangeContent
             )
         }
     }

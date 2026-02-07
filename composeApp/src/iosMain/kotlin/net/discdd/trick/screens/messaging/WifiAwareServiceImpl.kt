@@ -1,5 +1,6 @@
 package net.discdd.trick.screens.messaging
 
+import net.discdd.trick.data.currentTimeMillis
 import net.discdd.trick.messaging.ChatMessage
 import net.discdd.trick.messaging.TextContent
 
@@ -12,7 +13,7 @@ class WifiAwareServiceImpl : WifiAwareService {
         // WiFi Aware is not available on iOS - send a system message
         val systemMessage = ChatMessage(
             message_id = "system-ios",
-            timestamp = System.currentTimeMillis(),
+            timestamp = currentTimeMillis(),
             sender_id = "system",
             text_content = TextContent("[System] WiFi Aware is only available on Android")
         )

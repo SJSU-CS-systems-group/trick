@@ -30,6 +30,8 @@ import net.discdd.trick.signal.SignalSessionManager
 import net.discdd.trick.screens.chat.ChatScreen
 import net.discdd.trick.screens.contacts.ContactsListScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
+import androidx.savedstate.read
+import net.discdd.trick.util.urlDecode
 import org.koin.compose.koinInject
 
 /**
@@ -190,10 +192,10 @@ fun TrickNavHost(
                 navArgument("peerId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val shortId = backStackEntry.arguments?.getString("shortId") ?: ""
+            val shortId = backStackEntry.arguments?.read { getStringOrNull("shortId") } ?: ""
             // peerId is used for WiFi Aware operations (deviceId when available, otherwise shortId)
-            val peerId = net.discdd.trick.util.urlDecode(
-                backStackEntry.arguments?.getString("peerId") ?: shortId,
+            val peerId = urlDecode(
+                backStackEntry.arguments?.read { getStringOrNull("peerId") } ?: shortId,
                 "UTF-8"
             )
             val isContactConnected = peerId in connectedPeerIds
