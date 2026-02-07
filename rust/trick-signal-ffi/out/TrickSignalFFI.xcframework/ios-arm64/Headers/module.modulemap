@@ -1,0 +1,4 @@
+module TrickSignalFFI {
+    header "trick_signal_ffi.h"
+    export *
+}

@@ -20,6 +20,14 @@ kotlin {
         }
     }
 
+    // Map KMP iOS targets to Rust triple directories
+    val rustTargetDir = "${project.rootDir}/rust/trick-signal-ffi/target"
+    val iosTargetToRustTriple = mapOf(
+        "iosArm64" to "aarch64-apple-ios",
+        "iosSimulatorArm64" to "aarch64-apple-ios-sim",
+        "iosX64" to "x86_64-apple-ios"
+    )
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -30,13 +38,17 @@ kotlin {
             isStatic = true
         }
 
+        val rustTriple = iosTargetToRustTriple[iosTarget.name]
+            ?: error("Unknown iOS target: ${iosTarget.name}")
+
         // Configure C interop for LibSignal FFI on iOS
         iosTarget.compilations.getByName("main") {
             cinterops {
                 val libsignal by creating {
                     defFile(project.file("src/nativeInterop/cinterop/libsignal.def"))
                     packageName("net.discdd.trick.libsignal.bridge")
-                    compilerOpts("-I${project.file("src/nativeInterop/cinterop").absolutePath}")
+                    compilerOpts("-I${project.rootDir}/rust/trick-signal-ffi")
+                    extraOpts("-libraryPath", "$rustTargetDir/$rustTriple/release")
                 }
             }
         }

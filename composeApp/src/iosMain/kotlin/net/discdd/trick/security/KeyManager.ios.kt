@@ -1,21 +1,19 @@
 package net.discdd.trick.security
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import net.discdd.trick.libsignal.IdentityKeyPair
 import net.discdd.trick.libsignal.PrivateKey
 import net.discdd.trick.libsignal.PublicKey
 import net.discdd.trick.libsignal.createLibSignalManager
 import platform.Foundation.NSData
-import platform.Foundation.NSString
 import platform.Foundation.NSUserDefaults
 import platform.Foundation.create
-import platform.Foundation.dataUsingEncoding
-import platform.Foundation.NSUTF8StringEncoding
-import platform.darwin.NSObject
 import platform.posix.memcpy
 
 /**
@@ -51,14 +49,14 @@ actual class KeyManager {
 
         // Store keys in UserDefaults
         // TODO: Move private key to Keychain for better security
-        userDefaults.setObject(
-            NSData.create(bytes = keyPair.privateKey.data.toUByteArray().refTo(0), length = keyPair.privateKey.data.size.toULong()),
-            PREF_PRIVATE_KEY
-        )
-        userDefaults.setObject(
-            NSData.create(bytes = keyPair.publicKey.data.toUByteArray().refTo(0), length = keyPair.publicKey.data.size.toULong()),
-            PREF_PUBLIC_KEY
-        )
+        val privateKeyData = keyPair.privateKey.data.usePinned { pinned ->
+            NSData.create(bytes = pinned.addressOf(0), length = keyPair.privateKey.data.size.toULong())
+        }
+        userDefaults.setObject(privateKeyData, PREF_PRIVATE_KEY)
+        val publicKeyData = keyPair.publicKey.data.usePinned { pinned ->
+            NSData.create(bytes = pinned.addressOf(0), length = keyPair.publicKey.data.size.toULong())
+        }
+        userDefaults.setObject(publicKeyData, PREF_PUBLIC_KEY)
 
         return keyPair
     }
@@ -74,8 +72,12 @@ actual class KeyManager {
         val publicKeyBytes = ByteArray(publicKeyData.length.toInt())
 
         memScoped {
-            memcpy(privateKeyBytes.refTo(0), privateKeyData.bytes, privateKeyData.length)
-            memcpy(publicKeyBytes.refTo(0), publicKeyData.bytes, publicKeyData.length)
+            privateKeyBytes.usePinned { pinned ->
+                memcpy(pinned.addressOf(0), privateKeyData.bytes, privateKeyData.length)
+            }
+            publicKeyBytes.usePinned { pinned ->
+                memcpy(pinned.addressOf(0), publicKeyData.bytes, publicKeyData.length)
+            }
         }
 
         return IdentityKeyPair(
@@ -88,10 +90,10 @@ actual class KeyManager {
      * Store a peer's public key.
      */
     actual fun storePeerPublicKey(peerId: String, publicKey: PublicKey) {
-        userDefaults.setObject(
-            NSData.create(bytes = publicKey.data.toUByteArray().refTo(0), length = publicKey.data.size.toULong()),
-            "$PEER_KEY_PREFIX$peerId"
-        )
+        val keyData = publicKey.data.usePinned { pinned ->
+            NSData.create(bytes = pinned.addressOf(0), length = publicKey.data.size.toULong())
+        }
+        userDefaults.setObject(keyData, "$PEER_KEY_PREFIX$peerId")
     }
 
     /**
@@ -102,7 +104,9 @@ actual class KeyManager {
 
         val publicKeyBytes = ByteArray(publicKeyData.length.toInt())
         memScoped {
-            memcpy(publicKeyBytes.refTo(0), publicKeyData.bytes, publicKeyData.length)
+            publicKeyBytes.usePinned { pinned ->
+                memcpy(pinned.addressOf(0), publicKeyData.bytes, publicKeyData.length)
+            }
         }
 
         return PublicKey(publicKeyBytes)
@@ -138,5 +142,5 @@ actual class KeyManager {
  * iOS implementation of currentTimeMillis.
  */
 internal actual fun currentTimeMillis(): Long {
-    return (platform.Foundation.NSDate().timeIntervalSince1970 * 1000).toLong()
+    return net.discdd.trick.data.currentTimeMillis()
 }
