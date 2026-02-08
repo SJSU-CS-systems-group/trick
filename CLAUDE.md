@@ -13,6 +13,33 @@ This document outlines the development rules and best practices for working on t
 - **Avoid platform-specific dependencies in common code** - Only use multiplatform libraries in `commonMain`
 - **Use Kotlin Coroutines and Flow** for asynchronous operations (works across all platforms)
 
+### 1.1. iOS/Xcode Compilation Requirements
+
+**CRITICAL**: All code in `composeApp/src/iosMain/` MUST compile with Xcode's toolchain. This means:
+
+1. **NO Java APIs**: Java standard library (`java.*`, `javax.*`) is NOT available on iOS
+   - WRONG: `import java.net.URLEncoder` in `iosMain`
+   - CORRECT: `import platform.Foundation.*` and use `NSString.stringByAddingPercentEncodingWithAllowedCharacters`
+   
+2. **NO Android APIs**: Android-specific APIs are NOT available on iOS
+   - WRONG: `import android.content.Context` in `iosMain`
+   - CORRECT: Use iOS-specific APIs via `platform.Foundation.*` or `platform.Darwin.*`
+
+3. **Use platform APIs**: Always use platform-specific imports:
+   - `platform.Foundation.*` for iOS Foundation framework (NSString, NSData, NSDate, etc.)
+   - `platform.Darwin.*` for Darwin-specific APIs
+   - `platform.CoreCrypto.*` for cryptographic operations
+   - `kotlinx.cinterop.*` for C interop operations
+
+4. **C Interop**: Use `kotlinx.cinterop.*` for C FFI operations:
+   - Always add `@OptIn(ExperimentalForeignApi::class)` annotation
+   - Use `usePinned` for memory pinning
+   - Use `addressOf` for pointer operations
+
+5. **Test compilation**: Generated iOS code should be verified to compile in Xcode
+
+**When in doubt, check existing iOS implementations in `composeApp/src/iosMain/` for reference patterns.**
+
 ### 2. Signal Protocol (Double Ratchet)
 
 #### Architecture Overview
@@ -183,11 +210,44 @@ actual class PlatformFeature {
 - Use Android-specific APIs only in `androidMain`
 - Request permissions using `rememberLauncherForActivityResult`
 - Use `Context` for platform services (passed via DI)
+- **Java APIs are available**: Can use `java.net.*`, `java.io.*`, `java.security.*`, `java.util.*`, etc.
+- Common Android imports:
+  - `java.net.URLEncoder` / `java.net.URLDecoder` for URL encoding
+  - `java.util.UUID` for UUID generation
+  - `java.io.File` for file operations
+  - `java.security.MessageDigest` for hashing
+  - `java.security.KeyStore` for secure storage
 
 #### iOS
+- **CRITICAL: iOS code MUST compile with Xcode's toolchain**
+- **NEVER use Java APIs in iOS code** - Java APIs (`java.*`, `javax.*`) are NOT available on iOS
+- **NEVER use Android-specific imports** in `iosMain` source files
 - Use iOS-specific APIs only in `iosMain`
 - Request permissions using platform-specific APIs
-- Use Foundation APIs via `platform.Foundation.*` imports
+- **Always use `platform.Foundation.*` for iOS native APIs**:
+  - `platform.Foundation.NSString` for string operations
+  - `platform.Foundation.NSData` for byte arrays
+  - `platform.Foundation.NSDate` for dates
+  - `platform.Foundation.NSUUID` for UUIDs
+  - `platform.Foundation.NSUserDefaults` for preferences
+  - `platform.Foundation.NSFileManager` for file operations
+  - `platform.Foundation.NSCharacterSet` for character set operations
+- **Always use `kotlinx.cinterop.*` for C interop**:
+  - `kotlinx.cinterop.ExperimentalForeignApi` annotation required
+  - `kotlinx.cinterop.usePinned` for memory pinning
+  - `kotlinx.cinterop.addressOf` for pointer operations
+  - `kotlinx.cinterop.reinterpret` for type conversions
+- **Use `platform.CoreCrypto.*` for cryptographic operations** (not `java.security.*`):
+  - `platform.CoreCrypto.CC_SHA256` for SHA-256 hashing
+  - `platform.CoreCrypto.CC_SHA256_DIGEST_LENGTH` for digest length
+- **Use `platform.Darwin.*` for Darwin-specific APIs** when needed
+- **String operations**: Use `NSString` methods, not Java `String` methods
+  - Example: `(s as NSString).stringByAddingPercentEncodingWithAllowedCharacters(...)`
+- **File I/O**: Use `NSFileManager` and `NSData`, not `java.io.*`
+  - Example: `NSFileManager.defaultManager` for file operations
+- **Networking**: Use `ktor-client-darwin`, not `java.net.*`
+- **Collections**: Use Kotlin standard library collections, not Java collections
+- **Memory management**: Always use `usePinned` for memory pinning in C interop operations
 
 ### 12. Database Migrations
 
@@ -230,35 +290,48 @@ actual class PlatformFeature {
 1. **Don't use Java/Android-specific APIs in common code**
    - Use Kotlin standard library or multiplatform libraries
 
-2. **Don't implement custom encryption**
+2. **CRITICAL: Don't use Java APIs in iOS code**
+   - WRONG: `import java.net.URLEncoder` in `iosMain`
+   - CORRECT: `import platform.Foundation.*` and use `NSString.stringByAddingPercentEncodingWithAllowedCharacters`
+   - WRONG: `import java.util.UUID` in `iosMain`
+   - CORRECT: `import platform.Foundation.NSUUID` and use `NSUUID().UUIDString()`
+   - WRONG: `import java.io.File` in `iosMain`
+   - CORRECT: `import platform.Foundation.NSFileManager` and use `NSFileManager.defaultManager`
+   - WRONG: `import java.security.MessageDigest` in `iosMain`
+   - CORRECT: `import platform.CoreCrypto.CC_SHA256` and use `kotlinx.cinterop` for hashing
+   - WRONG: `import java.security.KeyStore` in `iosMain`
+   - CORRECT: Use `platform.Security.*` (Keychain Services) or `platform.Foundation.NSUserDefaults`
+   - **Always check imports in `iosMain` files - if you see `java.*` or `javax.*`, it's wrong!**
+
+3. **Don't implement custom encryption**
    - Always use Signal Protocol via `SignalNativeBridge` (Rust FFI)
    - Never bypass the Rust FFI layer for cryptographic operations
 
-3. **Don't forget to build the Rust library**
+4. **Don't forget to build the Rust library**
    - Android: Run `./gradlew buildRustAndroid` before building the app
    - iOS: Run `rust/trick-signal-ffi/build-ios.sh` before building
    - The native libraries are not auto-built during Gradle build
 
-4. **Don't use platform-specific DI frameworks**
+5. **Don't use platform-specific DI frameworks**
    - Use Koin for multiplatform DI
 
-5. **Don't put platform-specific code in commonMain**
+6. **Don't put platform-specific code in commonMain**
    - Use expect/actual pattern
    - `SignalNativeBridge` is expect/actual, but `LibSignalManager` is common
 
-6. **Don't use blocking I/O**
+7. **Don't use blocking I/O**
    - Use coroutines and suspend functions
 
-7. **Don't expose platform-specific types in common interfaces**
+8. **Don't expose platform-specific types in common interfaces**
    - Use multiplatform types or create common abstractions
 
-8. **Don't forget Kyber prekeys**
+9. **Don't forget Kyber prekeys**
    - libsignal 0.86.7+ requires Kyber post-quantum prekeys
    - Always include `kyberPreKeyId`, `kyberPreKeyPublic`, and `kyberPreKeySignature` in PreKey bundles
 
-9. **Don't modify Rust FFI signatures without updating both platforms**
-   - Changes to `SignalNativeBridge` expect declaration require updates to both Android and iOS implementations
-   - Changes to Rust FFI functions require updating both JNI bridge (Android) and C FFI (iOS)
+10. **Don't modify Rust FFI signatures without updating both platforms**
+    - Changes to `SignalNativeBridge` expect declaration require updates to both Android and iOS implementations
+    - Changes to Rust FFI functions require updating both JNI bridge (Android) and C FFI (iOS)
 
 ## Quick Reference
 
@@ -302,6 +375,44 @@ cd rust/trick-signal-ffi
 2. Create migration if needed
 3. Test on both platforms
 4. Update repository implementations if needed
+
+### iOS Code Generation Checklist
+
+When generating iOS code (`iosMain`), verify:
+
+- [ ] **No Java imports**: Check that no `java.*` or `javax.*` imports exist
+- [ ] **No Android imports**: Check that no Android-specific imports exist
+- [ ] **Foundation APIs**: Use `platform.Foundation.*` for iOS native functionality
+- [ ] **C Interop**: Use `kotlinx.cinterop.*` for C FFI operations
+- [ ] **Xcode compatibility**: Code must compile with Xcode's Swift/Objective-C toolchain
+- [ ] **String handling**: Use `NSString` methods, not Java `String` methods
+- [ ] **File operations**: Use `NSFileManager` and `NSData`, not `java.io.*`
+- [ ] **Crypto operations**: Use `platform.CoreCrypto.*`, not `java.security.*`
+- [ ] **Memory management**: Use `usePinned` for memory pinning in C interop
+- [ ] **Annotations**: Add `@OptIn(ExperimentalForeignApi::class)` when using `kotlinx.cinterop`
+- [ ] **Reference existing code**: Check `composeApp/src/iosMain/` for similar implementations
+
+### iOS vs Android API Mapping
+
+When implementing platform-specific code, use this mapping as a reference:
+
+| Android (java.*) | iOS (platform.Foundation.*) | Notes |
+|------------------|----------------------------|-------|
+| `java.net.URLEncoder.encode()` | `NSString.stringByAddingPercentEncodingWithAllowedCharacters(NSCharacterSet.URLQueryAllowedCharacterSet)` | URL encoding |
+| `java.net.URLDecoder.decode()` | `NSString.stringByRemovingPercentEncoding` | URL decoding |
+| `java.util.UUID.randomUUID().toString()` | `NSUUID().UUIDString()` | UUID generation |
+| `java.io.File` | `NSFileManager.defaultManager` | File operations |
+| `java.security.MessageDigest.getInstance("SHA-256")` | `platform.CoreCrypto.CC_SHA256` (via `kotlinx.cinterop`) | SHA-256 hashing |
+| `java.security.KeyStore` | `platform.Security.*` (Keychain Services) or `NSUserDefaults` | Secure storage |
+| `java.util.Date` / `System.currentTimeMillis()` | `NSDate().timeIntervalSince1970 * 1000.0` | Timestamps |
+| `java.io.FileInputStream` / `FileOutputStream` | `NSData.dataWithContentsOfFile()` / `writeToFile()` | File I/O |
+| `java.nio.ByteBuffer` | `NSData` or `ByteArray` with `kotlinx.cinterop.usePinned` | Byte operations |
+
+**Key Principles:**
+- Android can use Java standard library (`java.*`)
+- iOS must use Foundation/Darwin APIs (`platform.Foundation.*`, `platform.Darwin.*`)
+- For C interop on iOS, always use `kotlinx.cinterop.*` with proper memory management
+- When in doubt, check existing iOS implementations in `composeApp/src/iosMain/`
 
 ## Questions?
 
