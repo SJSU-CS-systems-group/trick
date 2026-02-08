@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package net.discdd.trick
 
 import android.content.ClipData
@@ -30,6 +32,7 @@ import net.discdd.trick.signal.SignalSessionManager
 import net.discdd.trick.util.ShortIdGenerator
 import okio.ByteString.Companion.toByteString
 import org.koin.core.context.GlobalContext
+import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.Json
 
 private fun String.hexToBytes(): ByteArray {
@@ -85,7 +88,7 @@ private fun createKeyExchangeBundle(
  * - If the full protobuf fits comfortably in a single QR, use 1 part.
  * - Otherwise, split into exactly 2 parts of (roughly) equal size.
  *
- * Returns list of ISO-8859-1 encoded strings (1:1 byte mapping) for ZXing byte mode.
+ * Returns list of Base64-encoded strings for cross-platform QR compatibility.
  */
 // Conservative capacity for a single QR in byte mode with ErrorCorrectionLevel.L.
 // Version 40-L can hold up to 2,953 bytes; we stay well under that for robustness.
@@ -140,10 +143,9 @@ private fun encodePayloadForQR(
 
     return chunks.mapIndexed { index, chunk ->
         val partNumber = index + 1
-        // Header: [part_number, total_parts] + data
         val chunkWithHeader = byteArrayOf(partNumber.toByte(), totalParts.toByte()) + chunk.toByteArray()
         Log.d("KeyExchange", "QR part $partNumber/$totalParts: ${chunkWithHeader.size} bytes")
-        String(chunkWithHeader, Charsets.ISO_8859_1)
+        Base64.Default.encode(chunkWithHeader)
     }
 }
 
@@ -151,7 +153,7 @@ private fun encodePayloadForQR(
  * Parse a single QR chunk and return (partNumber, totalParts, data).
  */
 private fun parseQRChunk(data: String): Triple<Int, Int, ByteArray> {
-    val bytes = data.toByteArray(Charsets.ISO_8859_1)
+    val bytes = Base64.Default.decode(data)
     require(bytes.size >= 2) { "QR chunk too small" }
     val partNumber = bytes[0].toInt() and 0xFF
     val totalParts = bytes[1].toInt() and 0xFF
