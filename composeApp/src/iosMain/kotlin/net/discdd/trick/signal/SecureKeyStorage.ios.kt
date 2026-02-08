@@ -3,15 +3,22 @@
 package net.discdd.trick.signal
 
 import kotlinx.cinterop.*
+import platform.CoreFoundation.CFDictionaryAddValue
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.kCFBooleanTrue
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
+import platform.Foundation.CFBridgingRelease
+import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
-import platform.Foundation.NSMutableData
 import platform.Foundation.create
 import platform.Security.*
 import kotlin.random.Random
 
 /**
  * iOS implementation using Keychain Services for master key storage
- * and CommonCrypto for AES-GCM encryption.
+ * and CommonCrypto for AES-CBC encryption.
  *
  * Stores a 256-bit AES master key in the iOS Keychain.
  * Uses that key to encrypt/decrypt private key material.
@@ -26,27 +33,22 @@ actual class SecureKeyStorage actual constructor() {
 
     actual fun encryptPrivateKey(data: ByteArray): Pair<ByteArray, ByteArray> {
         val masterKey = getOrCreateMasterKey()
-        val iv = ByteArray(12)
+        // AES-CBC requires 16-byte IV (block size)
+        val iv = ByteArray(16)
         Random.nextBytes(iv)
-
-        // AES-GCM encryption using the master key
-        // For simplicity, use XOR with key+iv derived bytes as a placeholder
-        // until CommonCrypto integration is added
-        val encrypted = aesGcmEncrypt(masterKey, iv, data)
+        val encrypted = aesEncrypt(masterKey, iv, data)
         return Pair(encrypted, iv)
     }
 
     actual fun decryptPrivateKey(encrypted: ByteArray, iv: ByteArray): ByteArray {
         val masterKey = getOrCreateMasterKey()
-        return aesGcmDecrypt(masterKey, iv, encrypted)
+        return aesDecrypt(masterKey, iv, encrypted)
     }
 
     private fun getOrCreateMasterKey(): ByteArray {
-        // Try to load from Keychain
         val existing = loadFromKeychain()
         if (existing != null) return existing
 
-        // Generate new key and store
         val newKey = ByteArray(KEY_SIZE)
         memScoped {
             val result = SecRandomCopyBytes(null, KEY_SIZE.toULong(), newKey.refTo(0))
@@ -58,18 +60,34 @@ actual class SecureKeyStorage actual constructor() {
         return newKey
     }
 
+    /**
+     * Load the master key from the iOS Keychain.
+     * Uses CFDictionary directly to avoid Kotlin/CF type bridging issues.
+     */
     private fun loadFromKeychain(): ByteArray? = memScoped {
-        val query = mapOf(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to KEYCHAIN_SERVICE,
-            kSecAttrAccount to KEYCHAIN_ACCOUNT,
-            kSecReturnData to true,
-            kSecMatchLimit to kSecMatchLimitOne
-        )
+        val query = CFDictionaryCreateMutable(
+            null, 5,
+            kCFTypeDictionaryKeyCallBacks.ptr,
+            kCFTypeDictionaryValueCallBacks.ptr
+        ) ?: return null
+
+        CFDictionaryAddValue(query, kSecClass, kSecClassGenericPassword)
+        val serviceRef = CFBridgingRetain(KEYCHAIN_SERVICE)
+        val accountRef = CFBridgingRetain(KEYCHAIN_ACCOUNT)
+        CFDictionaryAddValue(query, kSecAttrService, serviceRef)
+        CFDictionaryAddValue(query, kSecAttrAccount, accountRef)
+        CFDictionaryAddValue(query, kSecReturnData, kCFBooleanTrue)
+        CFDictionaryAddValue(query, kSecMatchLimit, kSecMatchLimitOne)
+
         val resultPtr = alloc<COpaquePointerVar>()
-        val status = SecItemCopyMatching(query as platform.CoreFoundation.CFDictionaryRef, resultPtr.ptr)
+        val status = SecItemCopyMatching(query, resultPtr.ptr)
+
+        CFRelease(serviceRef)
+        CFRelease(accountRef)
+        CFRelease(query)
+
         if (status == errSecSuccess) {
-            val data = resultPtr.value?.let { interpretObjCPointerOrNull<NSData>(it.rawValue) } ?: return null
+            val data = CFBridgingRelease(resultPtr.value) as? NSData ?: return null
             ByteArray(data.length.toInt()).also { bytes ->
                 data.bytes?.let { ptr ->
                     bytes.usePinned { pinned ->
@@ -82,27 +100,41 @@ actual class SecureKeyStorage actual constructor() {
         }
     }
 
+    /**
+     * Save the master key to the iOS Keychain.
+     * Uses CFDictionary directly to avoid Kotlin/CF type bridging issues.
+     */
     private fun saveToKeychain(key: ByteArray) {
         val keyData: NSData = key.usePinned { pinned ->
             NSData.create(bytes = pinned.addressOf(0), length = key.size.toULong())
         }
-        val attrs = mapOf(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to KEYCHAIN_SERVICE,
-            kSecAttrAccount to KEYCHAIN_ACCOUNT,
-            kSecValueData to keyData,
-            kSecAttrAccessible to kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        )
-        SecItemAdd(attrs as platform.CoreFoundation.CFDictionaryRef, null)
+
+        val attrs = CFDictionaryCreateMutable(
+            null, 5,
+            kCFTypeDictionaryKeyCallBacks.ptr,
+            kCFTypeDictionaryValueCallBacks.ptr
+        ) ?: return
+
+        val serviceRef = CFBridgingRetain(KEYCHAIN_SERVICE)
+        val accountRef = CFBridgingRetain(KEYCHAIN_ACCOUNT)
+        val dataRef = CFBridgingRetain(keyData)
+        CFDictionaryAddValue(attrs, kSecClass, kSecClassGenericPassword)
+        CFDictionaryAddValue(attrs, kSecAttrService, serviceRef)
+        CFDictionaryAddValue(attrs, kSecAttrAccount, accountRef)
+        CFDictionaryAddValue(attrs, kSecValueData, dataRef)
+        CFDictionaryAddValue(attrs, kSecAttrAccessible, kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+
+        SecItemAdd(attrs, null)
+
+        CFRelease(serviceRef)
+        CFRelease(accountRef)
+        CFRelease(dataRef)
+        CFRelease(attrs)
     }
 
-    // Simple AES-GCM implementation using CommonCrypto
-    // This is a basic implementation - production should use CCCryptorGCM
-    private fun aesGcmEncrypt(key: ByteArray, iv: ByteArray, data: ByteArray): ByteArray {
-        // Use platform CCCrypt for AES encryption
-        // Tag is appended to ciphertext (last 16 bytes)
+    private fun aesEncrypt(key: ByteArray, iv: ByteArray, data: ByteArray): ByteArray {
         return memScoped {
-            val outSize = data.size + 16 // ciphertext + tag
+            val outSize = data.size + 16
             val output = ByteArray(outSize)
             val dataOutMoved = alloc<platform.posix.size_tVar>()
 
@@ -113,7 +145,7 @@ actual class SecureKeyStorage actual constructor() {
                             val status = platform.CoreCrypto.CCCrypt(
                                 platform.CoreCrypto.kCCEncrypt.toUInt(),
                                 platform.CoreCrypto.kCCAlgorithmAES.toUInt(),
-                                0u, // No padding for GCM
+                                0u,
                                 keyPinned.addressOf(0), key.size.toULong(),
                                 ivPinned.addressOf(0),
                                 dataPinned.addressOf(0), data.size.toULong(),
@@ -131,7 +163,7 @@ actual class SecureKeyStorage actual constructor() {
         }
     }
 
-    private fun aesGcmDecrypt(key: ByteArray, iv: ByteArray, encrypted: ByteArray): ByteArray {
+    private fun aesDecrypt(key: ByteArray, iv: ByteArray, encrypted: ByteArray): ByteArray {
         return memScoped {
             val output = ByteArray(encrypted.size)
             val dataOutMoved = alloc<platform.posix.size_tVar>()
