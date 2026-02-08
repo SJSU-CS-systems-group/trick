@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package net.discdd.trick.screens
 
 import android.Manifest
@@ -24,6 +26,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import kotlin.io.encoding.Base64
 
 /**
  * QR Code Scanner screen using CameraX and ML Kit
@@ -387,15 +390,18 @@ private fun scanBarcodesMulti(
         .addOnSuccessListener { barcodes ->
             for (barcode in barcodes) {
                 if (barcode.format == Barcode.FORMAT_QR_CODE) {
-                    val bytes = barcode.rawBytes
-                    if (bytes != null && bytes.size >= 2) {
-                        // Extract chunk ID from header to check if already scanned
-                        val chunkId = bytes[0].toInt() and 0xFF
-                        if (chunkId !in alreadyScanned) {
-                            val qrCode = String(bytes, Charsets.ISO_8859_1)
-                            Log.d("QRScanner", "QR Code chunk $chunkId detected: ${bytes.size} bytes")
-                            onQRCodeDetected(qrCode, chunkId)
+                    val qrCode = barcode.rawValue ?: continue
+                    try {
+                        val decoded = Base64.Default.decode(qrCode)
+                        if (decoded.size >= 2) {
+                            val chunkId = decoded[0].toInt() and 0xFF
+                            if (chunkId !in alreadyScanned) {
+                                Log.d("QRScanner", "QR Code chunk $chunkId detected: ${decoded.size} bytes")
+                                onQRCodeDetected(qrCode, chunkId)
+                            }
                         }
+                    } catch (e: Exception) {
+                        Log.d("QRScanner", "Non-base64 QR code, skipping")
                     }
                 }
             }
@@ -425,11 +431,9 @@ private fun scanBarcodes(
         .addOnSuccessListener { barcodes ->
             for (barcode in barcodes) {
                 if (barcode.format == Barcode.FORMAT_QR_CODE) {
-                    // Use rawBytes for binary data (protobuf), convert to ISO-8859-1 string
-                    val bytes = barcode.rawBytes
-                    if (bytes != null) {
-                        val qrCode = String(bytes, Charsets.ISO_8859_1)
-                        Log.d("QRScanner", "QR Code detected: ${bytes.size} bytes")
+                    val qrCode = barcode.rawValue
+                    if (qrCode != null) {
+                        Log.d("QRScanner", "QR Code detected: ${qrCode.length} chars")
                         onQRCodeDetected(qrCode)
                     }
                 }
@@ -439,7 +443,6 @@ private fun scanBarcodes(
             Log.e("QRScanner", "Barcode scanning failed", e)
         }
         .addOnCompleteListener {
-            // Always close the image once ML Kit is done with it
             imageProxy.close()
         }
 }

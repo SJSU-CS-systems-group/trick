@@ -70,8 +70,7 @@ private suspend fun generateQRCode(content: String, width: Int, height: Int): Bi
         // while still remaining robust at 1024x1024 resolution.
         put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
         put(EncodeHintType.MARGIN, 1)
-        // Force byte mode with ISO-8859-1 for raw protobuf bytes
-        put(EncodeHintType.CHARACTER_SET, "ISO-8859-1")
+        put(EncodeHintType.CHARACTER_SET, "UTF-8")
     }
 
     val writer = QRCodeWriter()

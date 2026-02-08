@@ -125,7 +125,7 @@ actual class KeyManager {
     actual fun getTrustedPeerIds(): List<String> {
         val dictionary = userDefaults.dictionaryRepresentation()
         return dictionary.keys
-            .mapNotNull { it as? String }
+            .mapNotNull { it?.toString() }
             .filter { it.startsWith(PEER_KEY_PREFIX) }
             .map { it.removePrefix(PEER_KEY_PREFIX) }
     }

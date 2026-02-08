@@ -1,8 +1,8 @@
 package net.discdd.trick.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -53,7 +53,8 @@ fun KeyExchangeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Section 1: Your QR Code
@@ -235,13 +236,11 @@ fun KeyExchangeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        LazyColumn {
-                            items(trustedPeers) { peerId ->
-                                TrustedPeerItem(
-                                    peerId = peerId,
-                                    onUntrust = { onUntrust(peerId) }
-                                )
-                            }
+                        trustedPeers.forEach { peerId ->
+                            TrustedPeerItem(
+                                peerId = peerId,
+                                onUntrust = { onUntrust(peerId) }
+                            )
                         }
                     }
                 }
