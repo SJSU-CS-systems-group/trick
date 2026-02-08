@@ -316,6 +316,13 @@ fun IOSKeyExchangeScreen(
 
                     println("Scanned part $partNumber of $totalParts")
 
+                    // Validate consistency: if expectedTotalParts is already set and differs,
+                    // this chunk is from a different payload - reset state and start fresh
+                    if (expectedTotalParts > 0 && expectedTotalParts != totalParts) {
+                        println("Warning: Scanned chunk has different totalParts ($totalParts vs expected $expectedTotalParts). Resetting scan state and starting new scan.")
+                        scannedChunks = emptyMap()
+                    }
+
                     // Update state and check for completion
                     expectedTotalParts = totalParts
                     scannedChunks = scannedChunks + (partNumber to chunkData)

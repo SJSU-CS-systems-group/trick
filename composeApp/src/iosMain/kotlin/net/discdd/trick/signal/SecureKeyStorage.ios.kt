@@ -104,7 +104,7 @@ actual class SecureKeyStorage actual constructor() {
      * Save the master key to the iOS Keychain.
      * Uses CFDictionary directly to avoid Kotlin/CF type bridging issues.
      */
-    private fun saveToKeychain(key: ByteArray) {
+    private fun saveToKeychain(key: ByteArray) = memScoped {
         val keyData: NSData = key.usePinned { pinned ->
             NSData.create(bytes = pinned.addressOf(0), length = key.size.toULong())
         }
@@ -113,23 +113,58 @@ actual class SecureKeyStorage actual constructor() {
             null, 5,
             kCFTypeDictionaryKeyCallBacks.ptr,
             kCFTypeDictionaryValueCallBacks.ptr
-        ) ?: return
+        ) ?: throw RuntimeException("Failed to create keychain attributes dictionary")
 
         val serviceRef = CFBridgingRetain(KEYCHAIN_SERVICE)
         val accountRef = CFBridgingRetain(KEYCHAIN_ACCOUNT)
         val dataRef = CFBridgingRetain(keyData)
-        CFDictionaryAddValue(attrs, kSecClass, kSecClassGenericPassword)
-        CFDictionaryAddValue(attrs, kSecAttrService, serviceRef)
-        CFDictionaryAddValue(attrs, kSecAttrAccount, accountRef)
-        CFDictionaryAddValue(attrs, kSecValueData, dataRef)
-        CFDictionaryAddValue(attrs, kSecAttrAccessible, kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+        
+        var queryAttrs: COpaquePointer? = null
+        var updateAttrs: COpaquePointer? = null
+        
+        try {
+            CFDictionaryAddValue(attrs, kSecClass, kSecClassGenericPassword)
+            CFDictionaryAddValue(attrs, kSecAttrService, serviceRef)
+            CFDictionaryAddValue(attrs, kSecAttrAccount, accountRef)
+            CFDictionaryAddValue(attrs, kSecValueData, dataRef)
+            CFDictionaryAddValue(attrs, kSecAttrAccessible, kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
 
-        SecItemAdd(attrs, null)
-
-        CFRelease(serviceRef)
-        CFRelease(accountRef)
-        CFRelease(dataRef)
-        CFRelease(attrs)
+            val status = SecItemAdd(attrs, null)
+            
+            if (status == errSecDuplicateItem) {
+                // Item already exists: update its data
+                queryAttrs = CFDictionaryCreateMutable(
+                    null, 3,
+                    kCFTypeDictionaryKeyCallBacks.ptr,
+                    kCFTypeDictionaryValueCallBacks.ptr
+                ) ?: throw RuntimeException("Failed to create keychain query dictionary")
+                
+                updateAttrs = CFDictionaryCreateMutable(
+                    null, 1,
+                    kCFTypeDictionaryKeyCallBacks.ptr,
+                    kCFTypeDictionaryValueCallBacks.ptr
+                ) ?: throw RuntimeException("Failed to create keychain update dictionary")
+                
+                CFDictionaryAddValue(queryAttrs, kSecClass, kSecClassGenericPassword)
+                CFDictionaryAddValue(queryAttrs, kSecAttrService, serviceRef)
+                CFDictionaryAddValue(queryAttrs, kSecAttrAccount, accountRef)
+                CFDictionaryAddValue(updateAttrs, kSecValueData, dataRef)
+                
+                val updateStatus = SecItemUpdate(queryAttrs, updateAttrs)
+                if (updateStatus != errSecSuccess) {
+                    throw RuntimeException("Failed to update key in keychain: $updateStatus")
+                }
+            } else if (status != errSecSuccess) {
+                throw RuntimeException("Failed to save key to keychain: $status")
+            }
+        } finally {
+            CFRelease(serviceRef)
+            CFRelease(accountRef)
+            CFRelease(dataRef)
+            CFRelease(attrs)
+            queryAttrs?.let { CFRelease(it) }
+            updateAttrs?.let { CFRelease(it) }
+        }
     }
 
     private fun aesEncrypt(key: ByteArray, iv: ByteArray, data: ByteArray): ByteArray {

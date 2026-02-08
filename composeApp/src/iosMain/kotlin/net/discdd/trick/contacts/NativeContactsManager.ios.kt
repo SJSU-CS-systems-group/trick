@@ -94,7 +94,6 @@ actual class NativeContactsManager {
 
             userDefaults.setObject(json.encodeToString(stored), "$TRICK_DATA_PREFIX$shortId")
             addShortId(shortId)
-            userDefaults.synchronize()
 
             // Update reactive flow
             contactsFlow.value = getTrickContacts()
@@ -113,7 +112,6 @@ actual class NativeContactsManager {
         return try {
             userDefaults.removeObjectForKey("$TRICK_DATA_PREFIX$shortId")
             removeShortId(shortId)
-            userDefaults.synchronize()
 
             // Update reactive flow
             contactsFlow.value = getTrickContacts()

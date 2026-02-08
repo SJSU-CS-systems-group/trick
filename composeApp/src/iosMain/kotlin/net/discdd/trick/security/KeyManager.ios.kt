@@ -94,7 +94,6 @@ actual class KeyManager {
             NSData.create(bytes = pinned.addressOf(0), length = publicKey.data.size.toULong())
         }
         userDefaults.setObject(keyData, "$PEER_KEY_PREFIX$peerId")
-        userDefaults.synchronize()
     }
 
     /**
@@ -118,7 +117,6 @@ actual class KeyManager {
      */
     actual fun removePeerPublicKey(peerId: String) {
         userDefaults.removeObjectForKey("$PEER_KEY_PREFIX$peerId")
-        userDefaults.synchronize()
     }
 
     /**
