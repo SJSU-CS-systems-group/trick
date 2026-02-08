@@ -124,7 +124,7 @@ actual class NativeContactsManager {
 
     actual fun hasContactsPermission(): Boolean {
         val status = CNContactStore.authorizationStatusForEntityType(CNEntityType.CNEntityTypeContacts)
-        return status == CNAuthorizationStatusAuthorized
+        return status == CNAuthorizationStatusAuthorized || status == CNAuthorizationStatusLimited
     }
 
     // ---- Internal helpers ----
