@@ -157,7 +157,7 @@ class AndroidWifiAwareManager(
 
         val publishConfig =
                 PublishConfig.Builder()
-                        .setServiceName("KMPChat")
+                        .setServiceName("_trick-msg._tcp")
                         .setServiceSpecificInfo(localDeviceId.toByteArray())
                         .build()
 
@@ -196,7 +196,7 @@ class AndroidWifiAwareManager(
             return
         }
 
-        val subscribeConfig = SubscribeConfig.Builder().setServiceName("KMPChat").build()
+        val subscribeConfig = SubscribeConfig.Builder().setServiceName("_trick-msg._tcp").build()
 
         try {
             wifiSession.subscribe(
