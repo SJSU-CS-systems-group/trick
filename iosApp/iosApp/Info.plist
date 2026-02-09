@@ -28,6 +28,8 @@
 	<string>Trick uses Wi-Fi Aware to communicate with nearby devices</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is needed to scan QR codes for key exchange</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is needed to send images in chat</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Contacts access is needed to link exchanged keys to your contacts</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
