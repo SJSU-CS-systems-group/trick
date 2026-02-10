@@ -12,6 +12,7 @@ import net.discdd.trick.data.ImageStorage
 import net.discdd.trick.di.initKoin
 import net.discdd.trick.screens.messaging.ImagePickerBridge
 import net.discdd.trick.screens.messaging.ImagePickerCallback
+import net.discdd.trick.screens.messaging.WifiAwarePairingPresenter
 import net.discdd.trick.screens.messaging.WifiAwareNativeBridge
 import net.discdd.trick.screens.messaging.WifiAwareServiceImpl
 import net.discdd.trick.screens.messaging.toByteArray
@@ -27,10 +28,12 @@ private var isInitialized = false
  *
  * @param bridge Optional Wi-Fi Aware native bridge from Swift (null on iOS < 26)
  * @param imagePicker Optional image picker bridge from Swift for photo selection
+ * @param pairingPresenter Optional native pairing presenter from Swift
  */
 fun MainViewController(
     bridge: WifiAwareNativeBridge? = null,
-    imagePicker: ImagePickerBridge? = null
+    imagePicker: ImagePickerBridge? = null,
+    pairingPresenter: WifiAwarePairingPresenter? = null
 ) = ComposeUIViewController {
     if (!isInitialized) {
         DatabaseProvider.initialize(Unit)
@@ -82,7 +85,8 @@ fun MainViewController(
         keyExchangeContent = { deviceId, onNavigateBack ->
             IOSKeyExchangeScreen(
                 deviceId = deviceId,
-                onNavigateBack = onNavigateBack
+                onNavigateBack = onNavigateBack,
+                pairingPresenter = pairingPresenter
             )
         }
     )

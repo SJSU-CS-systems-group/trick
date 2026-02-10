@@ -26,6 +26,7 @@ import net.discdd.trick.security.QRKeyExchange
 import net.discdd.trick.security.TRCKY_ORG_BASE_URL
 import net.discdd.trick.signal.PreKeyBundleData
 import net.discdd.trick.signal.SignalSessionManager
+import net.discdd.trick.screens.messaging.WifiAwarePairingPresenter
 import net.discdd.trick.util.ShortIdGenerator
 import okio.ByteString.Companion.toByteString
 import org.koin.compose.koinInject
@@ -189,7 +190,8 @@ private data class PendingKeyExchange(
 @Composable
 fun IOSKeyExchangeScreen(
     deviceId: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    pairingPresenter: WifiAwarePairingPresenter? = null
 ) {
     val keyManager = remember { KeyManager() }
     val nativeContactsManager: NativeContactsManager = koinInject()
@@ -507,6 +509,9 @@ fun IOSKeyExchangeScreen(
 
                 keyManager.removePeerPublicKey(peerId)
                 trustedPeers = keyManager.getTrustedPeerIds()
+            },
+            onWifiAwarePairing = pairingPresenter?.let { presenter ->
+                { presenter.presentPairingUI() }
             }
         )
     }

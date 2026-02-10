@@ -8,9 +8,14 @@ import WiFiAware
 struct ComposeView: UIViewControllerRepresentable {
     let bridge: WifiAwareBridge
     let imagePicker: ImagePickerCoordinator
+    let pairingPresenter: WifiAwarePairingCoordinator
 
     func makeUIViewController(context: Context) -> UIViewController {
-        let viewController = MainViewControllerKt.MainViewController(bridge: bridge, imagePicker: imagePicker)
+        let viewController = MainViewControllerKt.MainViewController(
+            bridge: bridge,
+            imagePicker: imagePicker,
+            pairingPresenter: pairingPresenter
+        )
         // Update the image picker's presenting view controller reference
         return viewController
     }
@@ -24,18 +29,23 @@ struct ContentView: View {
 
     private let bridge = WifiAwareBridge()
     private let imagePicker = ImagePickerCoordinator(presentingViewController: nil)
+    private let pairingPresenter = WifiAwarePairingCoordinator()
 
     var body: some View {
         Group {
             if isCheckingPairing {
                 ProgressView("Checking pairing status...")
             } else if isPaired {
-                ComposeView(bridge: bridge, imagePicker: imagePicker)
+                ComposeView(
+                    bridge: bridge,
+                    imagePicker: imagePicker,
+                    pairingPresenter: pairingPresenter
+                )
                     .ignoresSafeArea()
             } else {
-                NativePairingScreen {
+                NativePairingScreen(onPairingComplete: {
                     isPaired = true
-                }
+                }, autoDismissOnPaired: true)
             }
         }
         .task {

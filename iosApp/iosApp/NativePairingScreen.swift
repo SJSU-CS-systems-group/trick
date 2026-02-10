@@ -16,11 +16,15 @@ import Network
 /// Monitors `WAPairedDevice.allDevices(matching:)` to auto-detect pairing completion.
 struct NativePairingScreen: View {
     let onPairingComplete: () -> Void
+    let autoDismissOnPaired: Bool
 
     var body: some View {
         #if canImport(DeviceDiscoveryUI) && canImport(WiFiAware)
         if #available(iOS 26, *) {
-            PairingContent(onPairingComplete: onPairingComplete)
+            PairingContent(
+                onPairingComplete: onPairingComplete,
+                autoDismissOnPaired: autoDismissOnPaired
+            )
         } else {
             unsupportedView
         }
@@ -54,6 +58,7 @@ struct NativePairingScreen: View {
 @available(iOS 26, *)
 private struct PairingContent: View {
     let onPairingComplete: () -> Void
+    let autoDismissOnPaired: Bool
     @State private var monitorTask: Task<Void, Never>?
 
     var body: some View {
@@ -180,6 +185,9 @@ private struct PairingContent: View {
                 }
             }
             .task {
+                guard autoDismissOnPaired else {
+                    return
+                }
                 monitorTask = Task {
                     await monitorPairedDevices()
                 }
