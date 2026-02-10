@@ -71,12 +71,14 @@ fun TrickNavHost(
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted) {
             while (true) {
-                val rawPeers = wifiAwareService.getConnectedPeers()
-                val peersWithSession = rawPeers.filter { peerId ->
-                    signalSessionManager.hasSession(peerId)
+                if (signalSessionManager.isReady) {
+                    val rawPeers = wifiAwareService.getConnectedPeers()
+                    val peersWithSession = rawPeers.filter { peerId ->
+                        signalSessionManager.hasSession(peerId)
+                    }
+                    connectedPeerIds.clear()
+                    connectedPeerIds.addAll(peersWithSession)
                 }
-                connectedPeerIds.clear()
-                connectedPeerIds.addAll(peersWithSession)
                 delay(1000)
             }
         }

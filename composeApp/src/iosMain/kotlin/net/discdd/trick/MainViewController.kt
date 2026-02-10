@@ -1,5 +1,10 @@
 package net.discdd.trick
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ComposeUIViewController
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.data.DatabaseProvider
@@ -42,6 +47,15 @@ fun MainViewController(
     }
 
     val signalSessionManager = KoinPlatform.getKoin().get<SignalSessionManager>()
+
+    // Initialize Signal protocol on startup (matches Android's LaunchedEffect in MainActivity)
+    var signalReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        signalSessionManager.initialize()
+        signalSessionManager.replenishPreKeysIfNeeded()
+        signalReady = true
+    }
+
     val wifiAwareService = WifiAwareServiceImpl(signalSessionManager, bridge)
     
     // Create onPickImage callback if imagePicker is available
@@ -63,7 +77,7 @@ fun MainViewController(
     
     App(
         wifiAwareService = wifiAwareService,
-        permissionsGranted = true,
+        permissionsGranted = signalReady,
         onPickImage = onPickImage,
         keyExchangeContent = { deviceId, onNavigateBack ->
             IOSKeyExchangeScreen(

@@ -178,7 +178,7 @@ class WifiAwareServiceImpl(
         scope.launch {
             if (bridge == null) return@launch
 
-            if (!signalSessionManager.hasSession(peerId)) {
+            if (!signalSessionManager.isReady || !signalSessionManager.hasSession(peerId)) {
                 withContext(Dispatchers.Main) {
                     notifySystemMessage(
                         "[Error] Secure session not established. Exchange QR codes first.",
