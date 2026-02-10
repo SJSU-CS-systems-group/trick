@@ -21,24 +21,19 @@ enum ConnectionRole {
 }
 
 /// Deterministic role negotiation matching Android's DeviceIdentity.negotiateRole()
-/// Both devices independently compute the same roles using hash comparison.
-/// - Higher hash = SERVER (waits for handshake)
-/// - Lower hash = CLIENT (initiates handshake)
+/// Both devices independently compute the same roles using lexicographic comparison.
+/// - Lexicographically greater ID = SERVER (waits for handshake)
+/// - Lexicographically lesser ID = CLIENT (initiates handshake)
 func negotiateRole(localDeviceId: String, remoteDeviceId: String) -> ConnectionRole {
-    let localHash = localDeviceId.hashValue
-    let remoteHash = remoteDeviceId.hashValue
-    
-    if localHash > remoteHash {
+    // Use direct lexicographic comparison for deterministic, cross-platform role negotiation.
+    // Swift's String.hashValue is randomized per process and cannot be used here.
+    if localDeviceId > remoteDeviceId {
         return .server
-    } else if localHash < remoteHash {
+    } else if localDeviceId < remoteDeviceId {
         return .client
     } else {
-        // Tie-breaker: lexicographic comparison (same as Android)
-        if localDeviceId > remoteDeviceId {
-            return .server
-        } else {
-            return .client
-        }
+        // Same device ID on both sides - should not happen in practice
+        return .none
     }
 }
 
@@ -182,10 +177,16 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
             connectionTasks.removeAll()
             connectionMap.removeAll()
         }
-        
+
         activeConnectionsLock.lock()
+        let connectionsToCancel = activeConnections
         activeConnections.removeAll()
         activeConnectionsLock.unlock()
+
+        // Connections are released when their owning Tasks are cancelled above
+        for (peerId, _) in connectionsToCancel {
+            log("Released connection to \(peerId) during stop")
+        }
 
         nativeCallback?.onNativeStatusUpdated(status: "Stopped")
     }
@@ -395,7 +396,7 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
                 guard hasPairedDevices else {
                     self.log("No paired devices found, will retry in 5 seconds")
                     if self.isRunning {
-                        try? await Task.sleep(for: .seconds(5))
+                        try await Task.sleep(for: .seconds(5))
                         if self.isRunning && !Task.isCancelled {
                             self.startSubscriber()
                         }
@@ -445,16 +446,35 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
                     TCP()
                 })
 
+                let tempKey = "pending-\(UUID().uuidString)"
                 let task = Task { [weak self] in
                     guard let self = self else { return }
-                    await self.handleConnection(connection, isInitiator: true)
+                    await self.handleConnection(connection, isInitiator: true, tempTaskKey: tempKey)
                 }
-                _ = task
+                self.connectionQueue.sync {
+                    self.connectionTasks[tempKey] = task
+                }
 
-                try? await Task.sleep(for: .seconds(5))
-                
+                try await Task.sleep(for: .seconds(5))
+
                 if self.isRunning && !Task.isCancelled {
-                    self.startSubscriber()
+                    // Do not restart subscriber if we already have a connection to the desired peer
+                    let shouldRestart: Bool
+                    if let desired = self.desiredPeerId {
+                        self.activeConnectionsLock.lock()
+                        let alreadyConnected = self.activeConnections[desired] != nil
+                        self.activeConnectionsLock.unlock()
+                        shouldRestart = !alreadyConnected
+                    } else {
+                        // No desired peer set; no point restarting subscriber
+                        shouldRestart = false
+                    }
+
+                    if shouldRestart {
+                        self.startSubscriber()
+                    } else {
+                        self.log("Subscriber not restarting: already connected to desired peer or no desired peer set")
+                    }
                 }
             } catch is CancellationError {
                 // Normal cancellation
@@ -487,8 +507,9 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
 
     #if canImport(WiFiAware)
     @available(iOS 26, *)
-    private func handleConnection(_ connection: NetworkConnection<TCP>, isInitiator: Bool) async {
+    private func handleConnection(_ connection: NetworkConnection<TCP>, isInitiator: Bool, tempTaskKey: String? = nil) async {
         var registeredPeerId: String?
+        var handshakePeerId: String?  // tracks peer ID for pendingHandshakes cleanup
         
         log("Handling connection (isInitiator: \(isInitiator))")
 
@@ -542,29 +563,47 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
                 return
             }
             
-            // Check for duplicate connections BEFORE storing
+            // Check for duplicate connections or in-flight handshakes BEFORE proceeding
             activeConnectionsLock.lock()
             let existingConnection = activeConnections[remotePeerId] != nil
             activeConnectionsLock.unlock()
-            
+
             if existingConnection {
                 log("Already have connection to \(remotePeerId), skipping duplicate")
                 return
             }
-            
-            // Remove from pending handshakes
+
             pendingHandshakesLock.lock()
-            pendingHandshakes.remove(remotePeerId)
+            let alreadyPending = pendingHandshakes.contains(remotePeerId)
+            if !alreadyPending {
+                pendingHandshakes.insert(remotePeerId)
+            }
             pendingHandshakesLock.unlock()
+
+            handshakePeerId = remotePeerId
+
+            if alreadyPending {
+                log("Handshake already in progress for \(remotePeerId), skipping duplicate")
+                return
+            }
 
             // Store connection for sending
             activeConnectionsLock.lock()
             activeConnections[remotePeerId] = connection
             activeConnectionsLock.unlock()
-            
+
+            // Connection established — no longer pending
+            pendingHandshakesLock.lock()
+            pendingHandshakes.remove(remotePeerId)
+            pendingHandshakesLock.unlock()
+
             registeredPeerId = remotePeerId
             connectionQueue.sync {
                 connectionMap[remotePeerId] = true // Mark as connected
+                // Re-key the task from temp key to actual peer ID
+                if let tempKey = tempTaskKey, let task = connectionTasks.removeValue(forKey: tempKey) {
+                    connectionTasks[remotePeerId] = task
+                }
             }
 
             DispatchQueue.main.async { [weak self] in
@@ -592,6 +631,19 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
 
         if let peerId = registeredPeerId {
             handleDisconnect(peerId: peerId)
+        } else {
+            // Clean up pending handshake if we inserted but never fully connected
+            if let peerId = handshakePeerId {
+                pendingHandshakesLock.lock()
+                pendingHandshakes.remove(peerId)
+                pendingHandshakesLock.unlock()
+            }
+            if let tempKey = tempTaskKey {
+                // Connection failed before peer ID was established; clean up temp task entry
+                connectionQueue.sync {
+                    connectionTasks.removeValue(forKey: tempKey)
+                }
+            }
         }
     }
 
@@ -607,40 +659,46 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
 
     @available(iOS 26, *)
     private func receiveFramedWA(on connection: NetworkConnection<TCP>) async throws -> Data {
-        let headerData = try await connection.receive(exactly: 4).content
+        while true {
+            let headerData = try await connection.receive(exactly: 4).content
 
-        // Guard against incomplete reads (e.g., connection closed mid-frame)
-        guard headerData.count >= 4 else {
-            throw NSError(
-                domain: "WifiAwareBridge",
-                code: -2,
-                userInfo: [NSLocalizedDescriptionKey: "Incomplete header: expected 4 bytes, got \(headerData.count)"]
-            )
+            // Guard against incomplete reads (e.g., connection closed mid-frame)
+            guard headerData.count >= 4 else {
+                throw NSError(
+                    domain: "WifiAwareBridge",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Incomplete header: expected 4 bytes, got \(headerData.count)"]
+                )
+            }
+
+            let length = headerData.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+
+            // Heartbeat (zero-length frame) — skip and read the next header
+            if length == 0 {
+                continue
+            }
+
+            guard length <= 10_000_000 else {
+                throw NSError(
+                    domain: "WifiAwareBridge",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Frame too large"]
+                )
+            }
+
+            let payload = try await connection.receive(exactly: Int(length)).content
+
+            // Guard against incomplete payload reads
+            guard payload.count == Int(length) else {
+                throw NSError(
+                    domain: "WifiAwareBridge",
+                    code: -3,
+                    userInfo: [NSLocalizedDescriptionKey: "Incomplete payload: expected \(length) bytes, got \(payload.count)"]
+                )
+            }
+
+            return payload
         }
-
-        let length = headerData.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
-
-        // Heartbeat (zero-length frame) — skip
-        if length == 0 {
-            return try await receiveFramedWA(on: connection)
-        }
-
-        guard length <= 10_000_000 else {
-            throw NSError(domain: "WifiAwareBridge", code: -1, userInfo: [NSLocalizedDescriptionKey: "Frame too large"])
-        }
-
-        let payload = try await connection.receive(exactly: Int(length)).content
-        
-        // Guard against incomplete payload reads
-        guard payload.count == Int(length) else {
-            throw NSError(
-                domain: "WifiAwareBridge",
-                code: -3,
-                userInfo: [NSLocalizedDescriptionKey: "Incomplete payload: expected \(length) bytes, got \(payload.count)"]
-            )
-        }
-        
-        return payload
     }
     #endif
 
@@ -682,9 +740,14 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
 
     private func handleDisconnect(peerId: String) {
         activeConnectionsLock.lock()
-        activeConnections.removeValue(forKey: peerId)
+        let removedConnection = activeConnections.removeValue(forKey: peerId)
         activeConnectionsLock.unlock()
-        
+
+        // NetworkConnection is released when its owning Task is cancelled below
+        if removedConnection != nil {
+            log("Released NetworkConnection for peer \(peerId)")
+        }
+
         // Also clean up pending handshakes
         pendingHandshakesLock.lock()
         pendingHandshakes.remove(peerId)
@@ -706,6 +769,23 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
             if self.isRunning {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     self.nativeCallback?.onNativeStatusUpdated(status: "Reconnecting...")
+                }
+
+                // Restart subscriber if the disconnected peer was the desired peer
+                if self.desiredPeerId == peerId {
+                    // Use a short delay then restart subscriber to find the peer again
+                    Task { [weak self] in
+                        guard let self = self else { return }
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        if self.isRunning && !Task.isCancelled {
+                            #if canImport(WiFiAware)
+                            if #available(iOS 26, *) {
+                                self.subscriberRetries = 0
+                                self.startSubscriber()
+                            }
+                            #endif
+                        }
+                    }
                 }
             }
         }

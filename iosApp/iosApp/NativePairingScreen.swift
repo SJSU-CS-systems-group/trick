@@ -55,7 +55,6 @@ struct NativePairingScreen: View {
 private struct PairingContent: View {
     let onPairingComplete: () -> Void
     @State private var monitorTask: Task<Void, Never>?
-    @State private var selectedEndpoint: WAEndpoint?
 
     var body: some View {
         NavigationStack {
@@ -87,7 +86,6 @@ private struct PairingContent: View {
                                 )
                             ) { endpoint in
                                 print("[NativePairingScreen] Device selected with endpoint: \(endpoint)")
-                                selectedEndpoint = endpoint
                                 // Pairing happens automatically, monitorPairedDevices will detect it
                             } label: {
                                 VStack(spacing: 12) {

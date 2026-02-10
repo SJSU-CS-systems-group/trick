@@ -61,29 +61,21 @@ object DeviceIdentity {
      * @return Role.SERVER if this device should be server, Role.CLIENT if client
      */
     fun negotiateRole(localDeviceId: String, remoteDeviceId: String): Role {
-        // First comparison: hash code
-        val localHash = localDeviceId.hashCode()
-        val remoteHash = remoteDeviceId.hashCode()
-
+        // Use direct lexicographic comparison for deterministic, cross-platform role negotiation.
+        // hashCode() differs across platforms (JVM vs Swift vs native), so string comparison
+        // is the only reliable approach for consistent results on both Android and iOS.
         return when {
-            localHash > remoteHash -> {
-                Log.d(TAG, "Negotiated role: SERVER (hash: $localHash > $remoteHash)")
+            localDeviceId > remoteDeviceId -> {
+                Log.d(TAG, "Negotiated role: SERVER (lexicographic: local > remote)")
                 Role.SERVER
             }
-            localHash < remoteHash -> {
-                Log.d(TAG, "Negotiated role: CLIENT (hash: $localHash < $remoteHash)")
+            localDeviceId < remoteDeviceId -> {
+                Log.d(TAG, "Negotiated role: CLIENT (lexicographic: local < remote)")
                 Role.CLIENT
             }
             else -> {
-                // Collision: use lexicographic comparison as tie-breaker
-                val result = if (localDeviceId > remoteDeviceId) {
-                    Log.d(TAG, "Negotiated role: SERVER (lexicographic tie-break)")
-                    Role.SERVER
-                } else {
-                    Log.d(TAG, "Negotiated role: CLIENT (lexicographic tie-break)")
-                    Role.CLIENT
-                }
-                result
+                Log.e(TAG, "Negotiated role: NONE (identical device IDs)")
+                Role.NONE
             }
         }
     }

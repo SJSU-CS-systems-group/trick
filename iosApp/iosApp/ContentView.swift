@@ -43,6 +43,7 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
     private func checkPairingStatus() async {
         #if canImport(WiFiAware)
         if #available(iOS 26, *) {
