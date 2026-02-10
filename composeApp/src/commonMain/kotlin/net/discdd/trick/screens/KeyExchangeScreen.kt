@@ -34,7 +34,8 @@ fun KeyExchangeScreen(
     trustedPeers: List<String>,
     onNavigateBack: () -> Unit,
     onScanQR: () -> Unit,
-    onUntrust: (String) -> Unit
+    onUntrust: (String) -> Unit,
+    onWifiAwarePairing: (() -> Unit)? = null
 ) {
     var currentQrIndex by remember { mutableStateOf(0) }
     Scaffold(
@@ -214,6 +215,17 @@ fun KeyExchangeScreen(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text("Scan Peer's QR Code")
+            }
+
+            if (onWifiAwarePairing != null) {
+                Button(
+                    onClick = onWifiAwarePairing,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Text("WiFi Aware Pairing")
+                }
             }
 
             // Section 3: Trusted Peers List
