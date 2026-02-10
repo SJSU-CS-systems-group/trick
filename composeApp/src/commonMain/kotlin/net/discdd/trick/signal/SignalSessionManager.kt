@@ -146,6 +146,9 @@ class SignalSessionManager(
 
     private var isInitialized = false
 
+    /** Whether this manager has been initialized. Safe to check at any time. */
+    val isReady: Boolean get() = isInitialized
+
     companion object {
         private const val INITIAL_PREKEY_COUNT = 100
         private const val INITIAL_SIGNED_PREKEY_ID = 1
@@ -205,7 +208,7 @@ class SignalSessionManager(
     }
 
     fun hasSession(peerId: String, deviceId: Int = 1): Boolean {
-        checkInitialized()
+        if (!isInitialized) return false
         return database.trickDatabaseQueries
             .containsSession(peerId, deviceId.toLong())
             .executeAsOne() > 0

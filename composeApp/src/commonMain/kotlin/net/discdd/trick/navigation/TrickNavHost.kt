@@ -62,6 +62,7 @@ fun TrickNavHost(
     val discoveryStatus = remember { mutableStateOf("Waiting for permissions...") }
     val localDeviceId = remember { mutableStateOf("") }
     val connectedPeerIds = remember { mutableStateListOf<String>() }
+    val discoveryStarted = remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         localDeviceId.value = wifiAwareService.getDeviceId()
@@ -70,12 +71,14 @@ fun TrickNavHost(
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted) {
             while (true) {
-                val rawPeers = wifiAwareService.getConnectedPeers()
-                val peersWithSession = rawPeers.filter { peerId ->
-                    signalSessionManager.hasSession(peerId)
+                if (signalSessionManager.isReady) {
+                    val rawPeers = wifiAwareService.getConnectedPeers()
+                    val peersWithSession = rawPeers.filter { peerId ->
+                        signalSessionManager.hasSession(peerId)
+                    }
+                    connectedPeerIds.clear()
+                    connectedPeerIds.addAll(peersWithSession)
                 }
-                connectedPeerIds.clear()
-                connectedPeerIds.addAll(peersWithSession)
                 delay(1000)
             }
         }
@@ -92,6 +95,7 @@ fun TrickNavHost(
         if (textContent != null) {
             val msg = textContent.text
             val isSystemMessage = chatMessage.sender_id == "system" || msg.startsWith("Service discovered:")
+
             debugLogs.add(
                 "[App] Message received${if (wasEncrypted) " (encrypted)" else ""}: $msg"
             )
@@ -129,8 +133,9 @@ fun TrickNavHost(
         }
     }
 
+    // Start discovery when permissions are granted
     LaunchedEffect(permissionsGranted) {
-        if (permissionsGranted) {
+        if (permissionsGranted && !discoveryStarted.value) {
             discoveryStatus.value = "Starting..."
             debugLogs.add("[UI] Starting discovery...")
             wifiAwareService.startDiscovery { chatMessage, peerId ->
@@ -138,9 +143,7 @@ fun TrickNavHost(
             }
             discoveryStatus.value = "Running"
             debugLogs.add("[UI] Discovery running.")
-        } else {
-            discoveryStatus.value = "Waiting for permissions..."
-            debugLogs.add("[UI] Waiting for user to grant permissions...")
+            discoveryStarted.value = true
         }
     }
 
@@ -148,6 +151,7 @@ fun TrickNavHost(
         debugLogs.add("[UI] Manual refresh triggered - stopping discovery...")
         discoveryStatus.value = "Stopping..."
         wifiAwareService.stopDiscovery()
+        discoveryStarted.value = false
         debugLogs.add("[UI] Discovery stopped. Restarting...")
         discoveryStatus.value = "Restarting..."
         wifiAwareService.startDiscovery { chatMessage, peerId ->
@@ -155,6 +159,7 @@ fun TrickNavHost(
         }
         discoveryStatus.value = "Running (refreshed)"
         debugLogs.add("[UI] Discovery restarted successfully.")
+        discoveryStarted.value = true
     }
 
     NavHost(
@@ -164,19 +169,16 @@ fun TrickNavHost(
         composable(Screen.ContactsList.route) {
             ContactsListScreen(
                 onContactClick = { contact ->
-                    // Use deviceId for WiFi Aware peer matching (fallback to shortId for backward compatibility)
                     val peerId = contact.deviceId ?: contact.shortId
                     wifiAwareService.setDesiredPeerId(peerId)
                     refreshDiscovery()
                     navController.navigate(Screen.Chat.createRoute(contact.shortId, peerId))
                 },
                 onAddContactClick = {
-                    // Navigate to key exchange to add a new contact
                     navController.navigate(Screen.KeyExchange.route)
                 },
                 connectedPeerIds = connectedPeerIds.toList(),
                 onTestMessagingClick = {
-                    // Temporary bypass: go directly to messaging with a test contact ID
                     val testPeerId = "test-contact"
                     wifiAwareService.setDesiredPeerId(testPeerId)
                     refreshDiscovery()
@@ -193,7 +195,6 @@ fun TrickNavHost(
             )
         ) { backStackEntry ->
             val shortId = backStackEntry.arguments?.read { getStringOrNull("shortId") } ?: ""
-            // peerId is used for WiFi Aware operations (deviceId when available, otherwise shortId)
             val peerId = urlDecode(
                 backStackEntry.arguments?.read { getStringOrNull("peerId") } ?: shortId,
                 "UTF-8"

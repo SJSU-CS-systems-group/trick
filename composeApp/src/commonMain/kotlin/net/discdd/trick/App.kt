@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
 import net.discdd.trick.navigation.KeyExchangeContent
+import net.discdd.trick.navigation.OnPickImageRequest
 import net.discdd.trick.navigation.TrickNavHost
 import net.discdd.trick.screens.UnsupportedDeviceScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
@@ -17,6 +18,7 @@ fun App(
     wifiAwareService: WifiAwareService,
     permissionsGranted: Boolean = false,
     wifiAwareSupported: Boolean = true,
+    onPickImage: OnPickImageRequest? = null,
     keyExchangeContent: KeyExchangeContent? = null
 ) {
     MaterialTheme(
@@ -32,7 +34,7 @@ fun App(
                 navController = navController,
                 wifiAwareService = wifiAwareService,
                 permissionsGranted = permissionsGranted,
-                onPickImage = null,
+                onPickImage = onPickImage,
                 keyExchangeContent = keyExchangeContent
             )
         }

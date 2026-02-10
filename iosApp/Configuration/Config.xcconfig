@@ -1,4 +1,4 @@
-TEAM_ID=ddd_trick
+TEAM_ID=DDDTrick
 
 PRODUCT_NAME=Trick
 PRODUCT_BUNDLE_IDENTIFIER=net.discdd.trick.Trick$(TEAM_ID)
