@@ -1,6 +1,9 @@
 package net.discdd.trick.screens.chat
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,9 +41,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageBubble
+import net.discdd.trick.screens.messaging.rememberImageBitmap
 import net.discdd.trick.theme.LocalAppTheme
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -63,6 +70,7 @@ fun ChatScreen(
         ?: "Unknown"
 
     var text by remember { mutableStateOf("") }
+    var previewImageData by remember { mutableStateOf<ByteArray?>(null) }
     val listState = rememberLazyListState()
     val appTheme = LocalAppTheme.current
 
@@ -135,7 +143,10 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages) { message ->
-                    MessageBubble(message = message)
+                    MessageBubble(
+                        message = message,
+                        onImageClick = { imageData -> previewImageData = imageData }
+                    )
                 }
             }
 
@@ -177,6 +188,31 @@ fun ChatScreen(
                     ) {
                         Text("Send")
                     }
+                }
+            }
+        }
+    }
+
+    // Full-screen image preview dialog
+    previewImageData?.let { imageData ->
+        Dialog(
+            onDismissRequest = { previewImageData = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { previewImageData = null },
+                contentAlignment = Alignment.Center
+            ) {
+                val imageBitmap = rememberImageBitmap(imageData)
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap,
+                        contentDescription = "Full-screen image preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
         }

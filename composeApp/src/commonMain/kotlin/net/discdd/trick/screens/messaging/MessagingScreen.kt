@@ -331,7 +331,7 @@ fun MessagingScreen(
 }
 
 @Composable
-fun MessageBubble(message: Message) {
+fun MessageBubble(message: Message, onImageClick: ((ByteArray) -> Unit)? = null) {
     val isErrorMessage = message.content.startsWith("[Error]")
     
     // Remove [System] prefix if it exists (for backward compatibility)
@@ -372,7 +372,9 @@ fun MessageBubble(message: Message) {
                         ),
                 shape = RoundedCornerShape(16.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(
+                    if (message.type == MessageType.IMAGE && message.imageData != null) 4.dp else 12.dp
+            )) {
                 // Display image if it's an image message
                 if (message.type == MessageType.IMAGE && message.imageData != null) {
                     val imageBitmap = rememberImageBitmap(message.imageData)
@@ -380,7 +382,13 @@ fun MessageBubble(message: Message) {
                         Image(
                                 bitmap = imageBitmap,
                                 contentDescription = "Image",
-                                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                                modifier = Modifier.fillMaxWidth().then(
+                                    if (onImageClick != null) {
+                                        Modifier.clickable { onImageClick(message.imageData!!) }
+                                    } else {
+                                        Modifier
+                                    }
+                                ),
                                 contentScale = ContentScale.Fit
                         )
                     } else {
