@@ -143,7 +143,8 @@ actual object SignalNativeBridge {
     ): NativeEncryptResult {
         ensureLibraryLoaded()
         val outCiphertext = ByteArray(plaintext.size + 4096) // plaintext + Signal/Kyber overhead
-        val outUpdatedSession = ByteArray(8192)
+        // Session record can grow significantly with many unacknowledged messages (skipped ratchet keys)
+        val outUpdatedSession = ByteArray(maxOf(262_144, sessionRecord.size * 2))
         val outMeta = IntArray(2) // [messageType, sessionLen]
 
         val ctWritten = nativeEncryptMessage(
@@ -177,7 +178,8 @@ actual object SignalNativeBridge {
     ): NativeDecryptResult {
         ensureLibraryLoaded()
         val outPlaintext = ByteArray(ciphertext.size + 256)
-        val outUpdatedSession = ByteArray(8192)
+        // Session record can grow significantly with many unacknowledged messages (skipped ratchet keys)
+        val outUpdatedSession = ByteArray(maxOf(262_144, sessionRecord.size * 2))
         val outSenderIdentity = ByteArray(64)
         val outMeta = IntArray(4) // [consumedPkId, consumedKpkId, sessLen, idLen]
 

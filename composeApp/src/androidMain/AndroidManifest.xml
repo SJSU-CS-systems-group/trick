@@ -31,6 +31,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Stress test trigger via ADB broadcasts -->
+        <receiver
+            android:name=".metrics.StressTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="net.discdd.trick.STRESS_TEST" />
+                <action android:name="net.discdd.trick.STRESS_TEST_CANCEL" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

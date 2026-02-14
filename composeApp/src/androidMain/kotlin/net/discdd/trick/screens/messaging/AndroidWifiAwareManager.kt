@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import kotlin.coroutines.cancellation.CancellationException
+import net.discdd.trick.metrics.PerformanceTracker
 import okio.ByteString.Companion.toByteString
 
 /**
@@ -82,6 +83,16 @@ class AndroidWifiAwareManager(
     // State
     private val isRunning = AtomicBoolean(false)
     private val desiredPeerId = AtomicReference<String?>(null)
+    
+    // Bidirectional stress test mode
+    private val bidirectionalStressTestPeerId = AtomicReference<String?>(null)
+
+    // ── Performance metrics timers ───────────────────────────────────────
+    private var attachTimerToken: Long = -1
+    private var discoveryTimerToken: Long = -1
+    private var totalConnectTimerToken: Long = -1
+    private val connectionTimerTokens = java.util.concurrent.ConcurrentHashMap<String, Long>() // peerId → token
+    private val reconnectionTimerTokens = java.util.concurrent.ConcurrentHashMap<String, Long>() // peerId → token
 
     init {
         wifiAwareManager = context.getSystemService(Context.WIFI_AWARE_SERVICE) as? WifiAwareManager
@@ -124,9 +135,17 @@ class AndroidWifiAwareManager(
         }
 
         try {
+            // ── Metrics: start attach + total connect timers ─────────
+            attachTimerToken = PerformanceTracker.startTimer("wifi_aware", "attach_time")
+            totalConnectTimerToken = PerformanceTracker.startTimer("wifi_aware", "total_connect_time")
+
             wifiAwareManager?.attach(
                     object : AttachCallback() {
                         override fun onAttached(wifiSession: WifiAwareSession) {
+                            // ── Metrics: stop attach timer, start discovery timer ──
+                            PerformanceTracker.stopTimer(attachTimerToken, "wifi_aware", "attach_time")
+                            discoveryTimerToken = PerformanceTracker.startTimer("wifi_aware", "discovery_time")
+
                             session = wifiSession
                             startPublishing(wifiSession)
                             startSubscribing(wifiSession)
@@ -134,6 +153,8 @@ class AndroidWifiAwareManager(
                         }
 
                         override fun onAttachFailed() {
+                            PerformanceTracker.cancelTimer(attachTimerToken)
+                            PerformanceTracker.cancelTimer(totalConnectTimerToken)
                             Log.e(TAG, "WiFi Aware attach failed")
                             notifyMessage("[Error] Failed to attach to WiFi Aware")
                             isRunning.set(false)
@@ -243,6 +264,13 @@ class AndroidWifiAwareManager(
                             return
                         }
 
+        // ── Metrics: stop discovery timer on first peer found ────────
+        if (discoveryTimerToken >= 0) {
+            PerformanceTracker.stopTimer(discoveryTimerToken, "wifi_aware", "discovery_time",
+                mapOf("peer_id" to DeviceIdentity.getShortId(remoteDeviceId)))
+            discoveryTimerToken = -1
+        }
+
         peerDeviceIds[peerHandle] = remoteDeviceId
 
         if (connectionPool.hasConnection(remoteDeviceId)) return
@@ -324,6 +352,10 @@ class AndroidWifiAwareManager(
             Log.e(TAG, "Received handshake but we should be client! Ignoring.")
             return
         }
+
+        // ── Metrics: start server connection timer ───────────────────
+        connectionTimerTokens[remoteDeviceId] =
+            PerformanceTracker.startTimer("wifi_aware", "connection_server_time")
 
         notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTING)
 
@@ -421,6 +453,24 @@ class AndroidWifiAwareManager(
             pendingHandshakes.remove(peerHandle)
 
             Log.d(TAG, "[Server] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+
+            // ── Metrics: stop server connection timer + total connect ─
+            val peerShortId = DeviceIdentity.getShortId(remoteDeviceId)
+            connectionTimerTokens.remove(remoteDeviceId)?.let { token ->
+                PerformanceTracker.stopTimer(token, "wifi_aware", "connection_server_time",
+                    mapOf("peer_id" to peerShortId, "role" to "server"))
+            }
+            if (totalConnectTimerToken >= 0) {
+                PerformanceTracker.stopTimer(totalConnectTimerToken, "wifi_aware", "total_connect_time",
+                    mapOf("peer_id" to peerShortId, "role" to "server"))
+                totalConnectTimerToken = -1
+            }
+            reconnectionTimerTokens.remove(remoteDeviceId)?.let { token ->
+                PerformanceTracker.stopTimer(token, "wifi_aware", "reconnection_time",
+                    mapOf("peer_id" to peerShortId))
+            }
+            PerformanceTracker.recordMemorySnapshot(connectionPool.size())
+
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
                     "You're now connected to ${DeviceIdentity.getShortId(remoteDeviceId)}!",
@@ -429,10 +479,12 @@ class AndroidWifiAwareManager(
 
             startMessageListener(remoteDeviceId)
         } catch (e: CancellationException) {
+            connectionTimerTokens.remove(remoteDeviceId)?.let { PerformanceTracker.cancelTimer(it) }
             pendingHandshakes.remove(peerHandle)
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "[Server] Connection setup failed: ${e.message}", e)
+            connectionTimerTokens.remove(remoteDeviceId)?.let { PerformanceTracker.cancelTimer(it) }
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
             notifyMessage("[Error] Server connection failed: ${e.message}", remoteDeviceId)
             pendingHandshakes.remove(peerHandle)
@@ -451,6 +503,10 @@ class AndroidWifiAwareManager(
             )
             return
         }
+
+        // ── Metrics: start client connection timer ───────────────────
+        connectionTimerTokens[remoteDeviceId] =
+            PerformanceTracker.startTimer("wifi_aware", "connection_client_time")
 
         notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTING)
 
@@ -568,6 +624,24 @@ class AndroidWifiAwareManager(
             pendingHandshakes.remove(peerHandle)
 
             Log.d(TAG, "[Client] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+
+            // ── Metrics: stop client connection timer + total connect ─
+            val peerShortId = DeviceIdentity.getShortId(remoteDeviceId)
+            connectionTimerTokens.remove(remoteDeviceId)?.let { token ->
+                PerformanceTracker.stopTimer(token, "wifi_aware", "connection_client_time",
+                    mapOf("peer_id" to peerShortId, "role" to "client"))
+            }
+            if (totalConnectTimerToken >= 0) {
+                PerformanceTracker.stopTimer(totalConnectTimerToken, "wifi_aware", "total_connect_time",
+                    mapOf("peer_id" to peerShortId, "role" to "client"))
+                totalConnectTimerToken = -1
+            }
+            reconnectionTimerTokens.remove(remoteDeviceId)?.let { token ->
+                PerformanceTracker.stopTimer(token, "wifi_aware", "reconnection_time",
+                    mapOf("peer_id" to peerShortId))
+            }
+            PerformanceTracker.recordMemorySnapshot(connectionPool.size())
+
             notifyConnectionStatus(remoteDeviceId, ConnectionState.CONNECTED)
             notifyMessage(
                     "You're now connected to ${DeviceIdentity.getShortId(remoteDeviceId)}!",
@@ -576,10 +650,12 @@ class AndroidWifiAwareManager(
 
             startMessageListener(remoteDeviceId)
         } catch (e: CancellationException) {
+            connectionTimerTokens.remove(remoteDeviceId)?.let { PerformanceTracker.cancelTimer(it) }
             pendingHandshakes.remove(peerHandle)
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "[Client] Connection setup failed: ${e.message}", e)
+            connectionTimerTokens.remove(remoteDeviceId)?.let { PerformanceTracker.cancelTimer(it) }
             notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
             notifyMessage("[Error] Client connection failed: ${e.message}", remoteDeviceId)
             pendingHandshakes.remove(peerHandle)
@@ -604,6 +680,8 @@ class AndroidWifiAwareManager(
                             }
 
             try {
+                val peerShortId = DeviceIdentity.getShortId(peerId)
+
                 while (isActive && connection.socket?.isConnected == true) {
                     val messageLength = inputStream.readInt()
 
@@ -618,22 +696,100 @@ class AndroidWifiAwareManager(
                         break
                     }
 
-                    val messageBytes = ByteArray(messageLength)
-                    inputStream.readFully(messageBytes)
+                    // ── Metrics: socket read time ────────────────────────
+                    val messageBytes = PerformanceTracker.measure("transport", "socket_read_time",
+                        mapOf("wire_size" to (4 + messageLength).toString(), "peer_id" to peerShortId)) {
+                        val buf = ByteArray(messageLength)
+                        inputStream.readFully(buf)
+                        buf
+                    }
 
                     connection.updateLastMessageTime()
 
+                    // ── Metrics: E2E receive timer ───────────────────────
+                    val receiveE2eStart = System.nanoTime()
+
+                    // ── Metrics: deserialize time ────────────────────────
                     val chatMessage =
                             try {
-                                ChatMessage.ADAPTER.decode(messageBytes)
+                                PerformanceTracker.measure("transport", "deserialize_time",
+                                    mapOf("size" to messageBytes.size.toString(), "peer_id" to peerShortId)) {
+                                    ChatMessage.ADAPTER.decode(messageBytes)
+                                }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to decode protobuf message: ${e.message}")
                                 continue
                             }
 
+                    // ── Metrics: decrypt + process (also timed inside SignalSessionManager) ──
                     val decryptedMessage = handleReceivedMessage(chatMessage, peerId)
 
+                    // ── Metrics: determine content type from decrypted result ──
+                    val receivedContentType = when {
+                        decryptedMessage.photo_content != null -> "photo"
+                        decryptedMessage.text_content != null -> "text"
+                        else -> "unknown"
+                    }
+
+                    // ── Metrics: receive E2E total ───────────────────────
+                    val receiveE2eMs = (System.nanoTime() - receiveE2eStart) / 1_000_000.0
+                    PerformanceTracker.recordDuration("transport", "receive_e2e_time", receiveE2eMs,
+                        mapOf("content_type" to receivedContentType,
+                            "wire_size" to (4 + messageLength).toString(),
+                            "peer_id" to peerShortId))
+
+                    // ── Metrics: receive-side message size ───────────────
+                    val ciphertextSize = chatMessage.encrypted_content?.size ?: 0
+                    PerformanceTracker.recordValue("transport", "message_size", mapOf(
+                        "content_type" to receivedContentType,
+                        "ciphertext_size" to ciphertextSize.toString(),
+                        "wire_size" to (4 + messageLength).toString(),
+                        "peer_id" to peerShortId,
+                        "direction" to "receive"
+                    ))
+
                     withContext(Dispatchers.Main) { messageCallback?.invoke(decryptedMessage, peerId) }
+                    
+                    // Auto-detect stress test messages and enable bidirectional mode + auto-reply
+                    val messageText = decryptedMessage.text_content?.text ?: ""
+                    val isStressTestMessage = messageText.startsWith("stress_test_") || 
+                                             messageText.startsWith("ramp_") || 
+                                             messageText.startsWith("benchmark_") ||
+                                             messageText.startsWith("reply_")
+                    
+                    if (isStressTestMessage) {
+                        // Enable bidirectional mode for this peer if not already enabled
+                        val currentStressPeer = bidirectionalStressTestPeerId.get()
+                        if (currentStressPeer != peerId) {
+                            bidirectionalStressTestPeerId.set(peerId)
+                            Log.i(TAG, "Auto-detected stress test, enabling bidirectional mode for peer ${peerId.take(8)}")
+                        }
+                        
+                        // Auto-reply to keep the session ratcheted
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                // Small delay to avoid overwhelming the connection
+                                delay(10)
+                                // Send a simple reply message
+                                sendMessageToPeer("reply_${System.currentTimeMillis()}", peerId)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Auto-reply failed during stress test: ${e.message}")
+                            }
+                        }
+                    } else {
+                        // Auto-reply if bidirectional mode is already enabled for this peer
+                        val stressTestPeerId = bidirectionalStressTestPeerId.get()
+                        if (stressTestPeerId != null && peerId == stressTestPeerId) {
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    delay(10)
+                                    sendMessageToPeer("reply_${System.currentTimeMillis()}", peerId)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Auto-reply failed during stress test: ${e.message}")
+                                }
+                            }
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Message listener error for $peerId: ${e.message}")
@@ -656,7 +812,7 @@ class AndroidWifiAwareManager(
     fun sendMessageToPeer(message: String, peerId: String) {
         val textContent = TextContent(text = message)
         val contentBytes = byteArrayOf(CONTENT_TYPE_TEXT.toByte()) + textContent.encode()
-        sendEncryptedContent(contentBytes, peerId)
+        sendEncryptedContent(contentBytes, peerId, contentType = "text")
     }
 
     /** Broadcast message to all connected peers */
@@ -693,7 +849,7 @@ class AndroidWifiAwareManager(
             mime_type = mimeType
         )
         val contentBytes = byteArrayOf(CONTENT_TYPE_PHOTO.toByte()) + photoContent.encode()
-        sendEncryptedContent(contentBytes, peerId)
+        sendEncryptedContent(contentBytes, peerId, contentType = "photo")
     }
 
     /** Broadcast picture to all connected peers */
@@ -706,8 +862,10 @@ class AndroidWifiAwareManager(
     /**
      * Encrypt content bytes with Signal and send over the TCP connection.
      * Handles session check, encryption, framing, and error reporting.
+     *
+     * @param contentType "text" or "photo" — used for metrics tagging.
      */
-    private fun sendEncryptedContent(contentBytes: ByteArray, peerId: String) {
+    private fun sendEncryptedContent(contentBytes: ByteArray, peerId: String, contentType: String = "unknown") {
         scope.launch(Dispatchers.IO) {
             val connection = connectionPool.getConnection(peerId)
 
@@ -722,6 +880,11 @@ class AndroidWifiAwareManager(
                 return@launch
             }
 
+            // ── Metrics: E2E send timer covers encrypt + serialize + write ──
+            val sendE2eStart = System.nanoTime()
+            val peerShortId = DeviceIdentity.getShortId(peerId)
+            val plaintextSize = contentBytes.size
+
             try {
                 val outputStream =
                         connection.outputStream ?: throw Exception("OutputStream is null")
@@ -734,7 +897,19 @@ class AndroidWifiAwareManager(
                     return@launch
                 }
 
+                // ── Metrics: encrypt (also timed inside SignalSessionManager) ──
                 val result = signalSessionManager.encryptMessage(peerId, 1, contentBytes)
+                val ciphertextSize = result.ciphertext.size
+
+                // ── Metrics: record sizes ────────────────────────────────
+                PerformanceTracker.recordValue("transport", "message_size", mapOf(
+                    "content_type" to contentType,
+                    "plaintext_size" to plaintextSize.toString(),
+                    "ciphertext_size" to ciphertextSize.toString(),
+                    "overhead_bytes" to (ciphertextSize - plaintextSize).toString(),
+                    "peer_id" to peerShortId,
+                    "direction" to "send"
+                ))
 
                 val chatMessage = ChatMessage(
                     message_id = UUID.randomUUID().toString(),
@@ -744,11 +919,29 @@ class AndroidWifiAwareManager(
                     encryption_version = "signal-v1"
                 )
 
-                val messageBytes = chatMessage.encode()
+                // ── Metrics: serialize ───────────────────────────────────
+                val messageBytes = PerformanceTracker.measure("transport", "serialize_time",
+                    mapOf("content_type" to contentType, "peer_id" to peerShortId)) {
+                    chatMessage.encode()
+                }
 
-                outputStream.writeInt(messageBytes.size)
-                outputStream.write(messageBytes)
-                outputStream.flush()
+                val wireSize = 4 + messageBytes.size  // 4-byte length prefix + protobuf
+
+                // ── Metrics: socket write ────────────────────────────────
+                PerformanceTracker.measure("transport", "socket_write_time",
+                    mapOf("wire_size" to wireSize.toString(), "content_type" to contentType, "peer_id" to peerShortId)) {
+                    outputStream.writeInt(messageBytes.size)
+                    outputStream.write(messageBytes)
+                    outputStream.flush()
+                }
+
+                // ── Metrics: E2E send total ──────────────────────────────
+                val sendE2eMs = (System.nanoTime() - sendE2eStart) / 1_000_000.0
+                PerformanceTracker.recordDuration("transport", "send_e2e_time", sendE2eMs,
+                    mapOf("content_type" to contentType, "plaintext_size" to plaintextSize.toString(),
+                        "wire_size" to wireSize.toString(), "peer_id" to peerShortId))
+
+                PerformanceTracker.recordMemorySnapshot(connectionPool.size())
 
                 connection.updateLastMessageTime()
             } catch (e: SignalError.NoSession) {
@@ -868,6 +1061,10 @@ class AndroidWifiAwareManager(
 
         // Attempt reconnection if discovery is still running
         if (isRunning.get()) {
+            // ── Metrics: start reconnection timer ────────────────────
+            reconnectionTimerTokens[peerId] =
+                PerformanceTracker.startTimer("wifi_aware", "reconnection_time")
+
             scope.launch {
                 delay(2000)
                 notifyConnectionStatus(peerId, ConnectionState.RECONNECTING)
@@ -907,9 +1104,19 @@ class AndroidWifiAwareManager(
         }
     }
 
-    /** Get connected peer IDs */
+    /** Get connected peer IDs (full-length device IDs) */
     fun getConnectedPeers(): List<String> {
         return connectionPool.getPeerIds()
+    }
+
+    /**
+     * Resolve a short peer ID (first 8 chars) to the full device ID from the connection pool.
+     * Returns null if no connected peer matches.
+     */
+    fun resolveShortPeerId(shortId: String): String? {
+        return connectionPool.getPeerIds().firstOrNull { fullId ->
+            DeviceIdentity.getShortId(fullId) == shortId || fullId == shortId
+        }
     }
 
     /** Check if specific peer is connected */
@@ -930,6 +1137,19 @@ class AndroidWifiAwareManager(
 
     /** Get local device ID */
     fun getDeviceId(): String = localDeviceId
+    
+    /**
+     * Enable bidirectional stress test mode: automatically reply to messages from [peerId].
+     * Set to null to disable.
+     */
+    fun setBidirectionalStressTestMode(peerId: String?) {
+        bidirectionalStressTestPeerId.set(peerId)
+        if (peerId != null) {
+            Log.i(TAG, "Bidirectional stress test mode enabled for peer ${peerId.take(8)}")
+        } else {
+            Log.i(TAG, "Bidirectional stress test mode disabled")
+        }
+    }
 
     /**
      * Set the peer to connect to when discovered. Only this peer will get connection establishment.
