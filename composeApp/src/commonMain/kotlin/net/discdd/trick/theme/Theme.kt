@@ -1,11 +1,19 @@
 package net.discdd.trick.theme
 
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import org.jetbrains.compose.resources.Font
+import trick.composeapp.generated.resources.Res
+import trick.composeapp.generated.resources.satoshi_bold
+import trick.composeapp.generated.resources.satoshi_medium
+import trick.composeapp.generated.resources.satoshi_regular
 
 /** Butter yellow accent from Vaultchat-style reference. */
 private val TrickYellow = Color(0xFFFFFF81)
@@ -109,6 +117,36 @@ val LocalAppTheme = compositionLocalOf<AppThemeState> {
     AppThemeState(isDark = true, onToggleTheme = {})
 }
 
+@Composable
+private fun SatoshiFontFamily() = FontFamily(
+    Font(Res.font.satoshi_medium, FontWeight.Normal),
+    Font(Res.font.satoshi_bold, FontWeight.Medium),
+    Font(Res.font.satoshi_bold, FontWeight.Bold),
+)
+
+@Composable
+private fun SatoshiTypography(): Typography {
+    val satoshi = SatoshiFontFamily()
+    val default = Typography()
+    return Typography(
+        displayLarge = default.displayLarge.copy(fontFamily = satoshi),
+        displayMedium = default.displayMedium.copy(fontFamily = satoshi),
+        displaySmall = default.displaySmall.copy(fontFamily = satoshi),
+        headlineLarge = default.headlineLarge.copy(fontFamily = satoshi),
+        headlineMedium = default.headlineMedium.copy(fontFamily = satoshi),
+        headlineSmall = default.headlineSmall.copy(fontFamily = satoshi),
+        titleLarge = default.titleLarge.copy(fontFamily = satoshi),
+        titleMedium = default.titleMedium.copy(fontFamily = satoshi),
+        titleSmall = default.titleSmall.copy(fontFamily = satoshi),
+        bodyLarge = default.bodyLarge.copy(fontFamily = satoshi),
+        bodyMedium = default.bodyMedium.copy(fontFamily = satoshi),
+        bodySmall = default.bodySmall.copy(fontFamily = satoshi),
+        labelLarge = default.labelLarge.copy(fontFamily = satoshi),
+        labelMedium = default.labelMedium.copy(fontFamily = satoshi),
+        labelSmall = default.labelSmall.copy(fontFamily = satoshi),
+    )
+}
+
 /**
  * Trick app theme: Vaultchat-style dark or light (single source of truth for iOS and Android).
  * Use [isDark] to choose scheme; provide [AppThemeState] via CompositionLocalProvider at app root for theme toggle.
@@ -120,6 +158,7 @@ fun TrickTheme(
 ) {
     MaterialTheme(
         colorScheme = if (isDark) TrickDarkColorScheme else TrickLightColorScheme,
+        typography = SatoshiTypography(),
         content = content
     )
 }
