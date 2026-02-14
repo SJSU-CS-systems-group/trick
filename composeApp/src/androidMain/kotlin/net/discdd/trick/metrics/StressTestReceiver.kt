@@ -32,6 +32,14 @@ import java.util.concurrent.atomic.AtomicReference
  *       --es mode "benchmark" \
  *       --ei repeats 10
  *
+ * Usage — concurrent message test (measures max in-flight messages):
+ *   adb shell am broadcast -a net.discdd.trick.STRESS_TEST \
+ *       --es mode "concurrent" \
+ *       --ei concurrent_max 200 \
+ *       --ei concurrent_start 10 \
+ *       --ei concurrent_step 10 \
+ *       --ei concurrent_timeout 30
+ *
  * Cancel a running test:
  *   adb shell am broadcast -a net.discdd.trick.STRESS_TEST_CANCEL
  */
@@ -143,8 +151,22 @@ class StressTestReceiver : BroadcastReceiver() {
                             Log.i(TAG, "  benchmark: repeats=$repeats per size category")
                             runner?.runBenchmark(peerId, repeats)
                         }
+                        "concurrent" -> {
+                            val maxConcurrent = intent.getIntExtra("concurrent_max", 200)
+                            val startConcurrent = intent.getIntExtra("concurrent_start", 10)
+                            val stepSize = intent.getIntExtra("concurrent_step", 10)
+                            val timeoutSec = intent.getIntExtra("concurrent_timeout", 30)
+                            Log.i(TAG, "  concurrent: max=$maxConcurrent, start=$startConcurrent, step=$stepSize, timeout=${timeoutSec}s")
+                            runner?.runConcurrentMessageTest(
+                                peerId,
+                                maxConcurrent = maxConcurrent,
+                                startConcurrent = startConcurrent,
+                                stepSize = stepSize,
+                                timeoutPerStepSec = timeoutSec
+                            )
+                        }
                         else -> {
-                            Log.e(TAG, "Unknown stress test mode: $mode (use 'burst', 'ramp', or 'benchmark')")
+                            Log.e(TAG, "Unknown stress test mode: $mode (use 'burst', 'ramp', 'benchmark', or 'concurrent')")
                         }
                     }
                 }

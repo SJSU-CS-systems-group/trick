@@ -104,13 +104,16 @@ kotlin {
                 implementation("com.journeyapps:zxing-android-embedded:4.3.0")
                 implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
-                // CameraX for QR scanning
-                implementation("androidx.camera:camera-camera2:1.3.1")
-                implementation("androidx.camera:camera-lifecycle:1.3.1")
-                implementation("androidx.camera:camera-view:1.3.1")
+                // CameraX for QR scanning (1.4.1+ required for 16 KB page alignment on Android 15+)
+                implementation("androidx.camera:camera-camera2:1.4.2")
+                implementation("androidx.camera:camera-lifecycle:1.4.2")
+                implementation("androidx.camera:camera-view:1.4.2")
 
                 // Permissions handling
                 implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
+                // Force 16 KB-aligned version of AndroidX graphics path (Android 15+ compatibility)
+                implementation("androidx.graphics:graphics-path:1.0.1")
 
                 // JetBrains Compose preview/tooling ONLY on Android
                 implementation(compose.preview)
@@ -164,6 +167,14 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // Ensure 16 KB alignment for Android 15+ compatibility
+            // This forces proper alignment of all native libraries during APK packaging
+            useLegacyPackaging = false
+            // Pack all shared libraries uncompressed for proper alignment
+            pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libtrick_signal_ffi.so"
+        }
     }
 
     buildTypes {
@@ -193,12 +204,24 @@ dependencies {
 // Run with: ./gradlew buildRustAndroid
 tasks.register<Exec>("buildRustAndroid") {
     workingDir = file("../rust/trick-signal-ffi")
+    environment("ANDROID_NDK_HOME", System.getenv("ANDROID_NDK_HOME") ?: "")
     commandLine("cargo", "ndk",
         "-t", "aarch64-linux-android",
         "-t", "x86_64-linux-android",
         "-o", "${project.projectDir}/src/androidMain/jniLibs",
         "build", "--release"
     )
+    // Ensure NDK r28+ is used for 16 KB alignment support
+    doFirst {
+        val ndkHome = System.getenv("ANDROID_NDK_HOME")
+        if (ndkHome == null || ndkHome.isEmpty()) {
+            throw GradleException(
+                "ANDROID_NDK_HOME is not set. " +
+                "Please set it to NDK r28.0.12682487 or later for 16 KB alignment support. " +
+                "Example: export ANDROID_NDK_HOME=\$HOME/Library/Android/sdk/ndk/29.0.14206865"
+            )
+        }
+    }
 }
 
 // Wire Rust build to Android build (optional - enable when Rust toolchain is set up)
