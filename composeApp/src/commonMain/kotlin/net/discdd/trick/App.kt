@@ -1,17 +1,21 @@
 package net.discdd.trick
 
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import net.discdd.trick.navigation.KeyExchangeContent
 import net.discdd.trick.navigation.OnPickImageRequest
 import net.discdd.trick.navigation.TrickNavHost
 import net.discdd.trick.screens.UnsupportedDeviceScreen
 import net.discdd.trick.screens.messaging.WifiAwareService
+import net.discdd.trick.theme.AppThemeState
+import net.discdd.trick.theme.LocalAppTheme
+import net.discdd.trick.theme.TrickTheme
 
 @Composable
 fun App(
@@ -21,10 +25,15 @@ fun App(
     onPickImage: OnPickImageRequest? = null,
     keyExchangeContent: KeyExchangeContent? = null
 ) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
+    var isDarkTheme by remember { mutableStateOf(true) }
+    CompositionLocalProvider(
+        LocalAppTheme provides AppThemeState(
+            isDark = isDarkTheme,
+            onToggleTheme = { isDarkTheme = !isDarkTheme }
+        )
     ) {
-        Surface {
+        TrickTheme(isDark = isDarkTheme) {
+            Surface {
             if (!wifiAwareSupported) {
                 UnsupportedDeviceScreen()
                 return@Surface
@@ -37,6 +46,7 @@ fun App(
                 onPickImage = onPickImage,
                 keyExchangeContent = keyExchangeContent
             )
+        }
         }
     }
 }

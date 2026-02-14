@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import net.discdd.trick.screens.messaging.Message
 import net.discdd.trick.screens.messaging.MessageBubble
+import net.discdd.trick.theme.LocalAppTheme
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -63,6 +65,7 @@ fun ChatScreen(
 
     var text by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val appTheme = LocalAppTheme.current
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -77,6 +80,15 @@ fun ChatScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = appTheme.onToggleTheme) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = if (appTheme.isDark) "Switch to light theme" else "Switch to dark theme",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors()
