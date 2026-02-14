@@ -138,9 +138,8 @@ fun MessagingScreen(
                     )
                     if (onNavigateToContacts != null) {
                         Button(
-                                onClick = { onNavigateToContacts() },
-                                modifier = Modifier.height(36.dp)
-                        ) { Text("Contacts", fontSize = 12.sp) }
+                                onClick = { onNavigateToContacts() }
+                        ) { Text("Contacts") }
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -167,9 +166,8 @@ fun MessagingScreen(
                                     }
                     )
                     TextButton(
-                            onClick = { showFullDeviceId = !showFullDeviceId },
-                            modifier = Modifier.height(24.dp)
-                    ) { Text(text = if (showFullDeviceId) "Less" else "More", fontSize = 10.sp) }
+                            onClick = { showFullDeviceId = !showFullDeviceId }
+                    ) { Text(text = if (showFullDeviceId) "Less" else "More") }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -213,7 +211,7 @@ fun MessagingScreen(
                     ) {
                         Button(
                                 onClick = { onNavigateToKeyExchange() },
-                                modifier = Modifier.height(36.dp).weight(1f)
+                                modifier = Modifier.weight(1f)
                         ) {
                             Icon(
                                     Icons.Default.Settings,
@@ -221,7 +219,7 @@ fun MessagingScreen(
                                     modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Key Exchange", fontSize = 12.sp)
+                            Text("Key Exchange")
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -237,8 +235,8 @@ fun MessagingScreen(
                             text = "Status: $discoveryStatus",
                             style = MaterialTheme.typography.bodyMedium
                     )
-                    Button(onClick = { onRefresh() }, modifier = Modifier.height(32.dp)) {
-                        Text("Refresh", fontSize = 12.sp)
+                    Button(onClick = { onRefresh() }) {
+                        Text("Refresh")
                     }
                 }
             }
@@ -295,11 +293,15 @@ fun MessagingScreen(
         }
 
         // Message input
-        Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
+            )
+            Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Bottom
+            ) {
                 // Attachment button (only if onPickImage is provided)
                 if (onPickImage != null) {
                     IconButton(
@@ -313,7 +315,8 @@ fun MessagingScreen(
                         onValueChange = { text = it },
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Type a message...") },
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -370,7 +373,11 @@ fun MessageBubble(message: Message, onImageClick: ((ByteArray) -> Unit)? = null)
                                             else -> MaterialTheme.colorScheme.surfaceVariant
                                         }
                         ),
-                shape = RoundedCornerShape(16.dp)
+                shape = when {
+                    message.isServiceMessage || isErrorMessage -> RoundedCornerShape(20.dp)
+                    message.isSent -> RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
+                    else -> RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp)
+                }
         ) {
             Column(modifier = Modifier.padding(
                     if (message.type == MessageType.IMAGE && message.imageData != null) 4.dp else 12.dp

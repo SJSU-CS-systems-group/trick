@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +55,7 @@ fun ContactItem(
                     modifier = Modifier
                         .size(12.dp)
                         .clip(CircleShape)
-                        .background(if (isConnected) Color(0xFF4CAF50) else Color(0xFF9E9E9E))
+                        .background(if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
                         .align(Alignment.BottomEnd)
                 )
             }
