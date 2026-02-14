@@ -16,5 +16,5 @@ captures
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
-# Rust build artifacts
-**/target/
+**/rust/trick-signal-ffi/.cargo/
+**/rust/trick-signal-ffi/target/

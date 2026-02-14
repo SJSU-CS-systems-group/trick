@@ -2,19 +2,19 @@
 
 ## Test Configuration
 
-**Device 1**: Google Pixel 6a (Android 16, SDK 36) — 104270 metrics collected
-**Device 2**: Google Pixel 6 (Android 16, SDK 36) — 132174 metrics collected
+**Device 1**: Google Pixel 6a (Android 16, SDK 36) — 119441 metrics collected
+**Device 2**: Google Pixel 6 (Android 16, SDK 36) — 156924 metrics collected
 
-**Total Metrics**: 236444
+**Total Metrics**: 276365
 
 
 ## Table 1: System Setup Performance
 
 | Metric | Count | Min (ms) | Max (ms) | Mean (ms) | Std Dev (ms) |
 |--------|--:|--------:|---------:|----------:|-------------:|
-| WiFi Aware Attach | 4 | 261 | 274 | 268 | 5.9 |
-| Peer Discovery | 4 | 430 | 1632 | 1039 | 491.0 |
-| Total Connect (end-to-end) | 2 | 1393 | 2022 | 1708 | 444.8 |
+| WiFi Aware Attach | 5 | 248 | 274 | 264 | 10.0 |
+| Peer Discovery | 5 | 430 | 1632 | 977 | 447.2 |
+| Total Connect (end-to-end) | 3 | 1393 | 2022 | 1677 | 318.9 |
 | Reconnection | 46 | 2779 | 4102 | 3052 | 271.0 |
 
 
@@ -25,11 +25,11 @@
 | Send E2E Latency | photo | 45 | 48.5 | 42.6 | 75 |
 | Send E2E Latency | text | 21521 | 7.4 | 7.2 | 21 |
 | Receive E2E Latency | photo | 45 | 25.9 | 13.3 | 54 |
-| Receive E2E Latency | text | 16956 | 4.8 | 5.9 | 14 |
+| Receive E2E Latency | text | 19989 | 4.6 | 5.5 | 13 |
 | Signal Encrypt | photo | 44 | 21.509 | 14.665 | 46.026 |
 | Signal Encrypt | text | 21573 | 0.493 | 0.824 | 1.942 |
 | Signal Decrypt | photo | 44 | 8.646 | 9.672 | 29.142 |
-| Signal Decrypt | text | 16957 | 0.466 | 2.516 | 1.312 |
+| Signal Decrypt | text | 19990 | 0.420 | 2.321 | 1.067 |
 
 ### Ciphertext Overhead
 
@@ -69,6 +69,18 @@
 |------|--------:|--------------:|------------------:|
 | Text-only (100 messages) | 100 | 2627.745 | 38.1 |
 
+### Concurrent Test
+
+| Target Concurrent | Success | Peak In-Flight | Step Duration (ms) |
+|------------------:|--------:|---------------:|-------------------:|
+| 200 | 200 | 11 | 2102 |
+| 250 | 250 | 6 | 2054 |
+| 300 | 300 | 10 | 2069 |
+| 350 | 350 | 7 | 2096 |
+| 400 | 400 | 8 | 2093 |
+| 450 | 450 | 8 | 2091 |
+| 500 | 500 | 32 | 2116 |
+
 ### Ramp Test (Throughput Scalability)
 
 | Target (msg/s) | Achieved (msg/s) | Efficiency (%) | Messages in Step |
@@ -88,5 +100,5 @@
 
 | Metric | Count | Mean (MB) | Min (MB) | Max (MB) | Std Dev (MB) |
 |--------|--:|----------:|---------:|---------:|-------------:|
-| Heap Usage | 21666 | 88.2 | 5.9 | 192.3 | 35.0 |
-| Max Heap Size | 21666 | 134.0 | 28.8 | 192.3 | 30.0 |
+| Heap Usage | 24780 | 80.0 | 5.9 | 192.3 | 39.2 |
+| Max Heap Size | 24780 | 121.9 | 28.8 | 192.3 | 42.6 |
