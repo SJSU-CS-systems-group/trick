@@ -5,6 +5,7 @@
 #   cargo install cargo-ndk
 #   rustup target add aarch64-linux-android x86_64-linux-android
 #   ANDROID_NDK_HOME must be set (or ANDROID_HOME/ndk/<version>)
+#   NDK r28.0.12682487 or later required for 16 KB alignment (Android 15+)
 #
 # Output: .so files in composeApp/src/androidMain/jniLibs/
 
@@ -19,6 +20,8 @@ echo "Output: $JNI_LIBS_DIR"
 
 cd "$SCRIPT_DIR"
 
+# 16 KB page alignment is configured via .cargo/config.toml rustflags
+# The flag -Wl,-z,max-page-size=16384 ensures ELF LOAD segments are 16 KB aligned
 cargo ndk \
     -t aarch64-linux-android \
     -t x86_64-linux-android \
