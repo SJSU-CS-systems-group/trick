@@ -2,6 +2,7 @@ package net.discdd.trick
 
 import android.Manifest
 import android.content.Context
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.wifi.aware.WifiAwareManager
 import android.os.Build
@@ -15,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import net.discdd.trick.metrics.StressTestReceiver
 import net.discdd.trick.screens.messaging.WifiAwareServiceImpl
 import net.discdd.trick.signal.SignalSessionManager
 import org.koin.core.component.KoinComponent
@@ -25,6 +27,9 @@ class MainActivity : ComponentActivity(), KoinComponent {
     // Track permission state
     private val permissionsGranted = mutableStateOf(false)
     private val wifiAwareSupported = mutableStateOf(false)
+
+    // Runtime-registered receiver so implicit ADB broadcasts are delivered (Android 8+)
+    private val stressTestReceiver = StressTestReceiver()
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -42,6 +47,18 @@ class MainActivity : ComponentActivity(), KoinComponent {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Register StressTestReceiver at runtime so implicit ADB broadcasts are delivered.
+        // Manifest-only receivers don't receive implicit broadcasts on Android 8+ (API 26+).
+        val stressFilter = IntentFilter().apply {
+            addAction(StressTestReceiver.ACTION_STRESS_TEST)
+            addAction(StressTestReceiver.ACTION_CANCEL)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(stressTestReceiver, stressFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(stressTestReceiver, stressFilter)
+        }
 
         // Check WiFi Aware support FIRST
         wifiAwareSupported.value = isWifiAwareSupported()
@@ -81,6 +98,15 @@ class MainActivity : ComponentActivity(), KoinComponent {
         }
     }
     
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(stressTestReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver was already unregistered
+        }
+    }
+
     /**
      * Check if WiFi Aware is supported on this device
      */

@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.discdd.trick.TrickDatabase
 import net.discdd.trick.data.currentTimeMillis
+import net.discdd.trick.metrics.MetricsCollector
 
 /**
  * Encryption result from Signal protocol
@@ -260,6 +261,8 @@ class SignalSessionManager(
                 .executeAsOneOrNull()
 
             try {
+                // ── Metrics: session build (X3DH + Kyber) ────────────
+                val sessionBuildStart = MetricsCollector.currentNanos()
                 val result = SignalNativeBridge.processPreKeyBundle(
                     identityPublic = identityPublicKey,
                     identityPrivate = identityPrivateKey,
@@ -270,6 +273,9 @@ class SignalSessionManager(
                     existingSession = existingSession,
                     bundle = bundle
                 )
+                val sessionBuildMs = (MetricsCollector.currentNanos() - sessionBuildStart) / 1_000_000.0
+                MetricsCollector.recordDuration("signal", "session_build_time", sessionBuildMs,
+                    mapOf("peer_id" to peerId.take(8)))
 
                 // Save session record
                 val now = currentTimeMillis()
@@ -345,6 +351,8 @@ class SignalSessionManager(
                 .executeAsOneOrNull()
                 ?: throw SignalError.NoSession(peerId)
 
+            // ── Metrics: encrypt time ─────────────────────────────
+            val encryptStart = MetricsCollector.currentNanos()
             val result = SignalNativeBridge.encryptMessage(
                 identityPublic = identityPublicKey,
                 identityPrivate = identityPrivateKey,
@@ -355,6 +363,19 @@ class SignalSessionManager(
                 peerIdentity = peerIdentity.identity_key,
                 plaintext = plaintext
             )
+            val encryptMs = (MetricsCollector.currentNanos() - encryptStart) / 1_000_000.0
+            MetricsCollector.recordDuration("signal", "encrypt_time", encryptMs,
+                mapOf("plaintext_size" to plaintext.size.toString(),
+                    "ciphertext_size" to result.ciphertext.size.toString(),
+                    "peer_id" to peerId.take(8)))
+
+            // ── Metrics: ciphertext overhead ─────────────────────────
+            MetricsCollector.recordValue("signal", "ciphertext_overhead", mapOf(
+                "plaintext_size" to plaintext.size.toString(),
+                "ciphertext_size" to result.ciphertext.size.toString(),
+                "overhead_bytes" to (result.ciphertext.size - plaintext.size).toString(),
+                "peer_id" to peerId.take(8)
+            ))
 
             // Save updated session
             val now = currentTimeMillis()
@@ -432,6 +453,8 @@ class SignalSessionManager(
             }
 
             try {
+                // ── Metrics: decrypt time ─────────────────────────────
+                val decryptStart = MetricsCollector.currentNanos()
                 val result = SignalNativeBridge.decryptMessage(
                     identityPublic = identityPublicKey,
                     identityPrivate = identityPrivateKey,
@@ -446,6 +469,12 @@ class SignalSessionManager(
                     ciphertext = ciphertext,
                     messageType = messageType
                 )
+                val decryptMs = (MetricsCollector.currentNanos() - decryptStart) / 1_000_000.0
+                MetricsCollector.recordDuration("signal", "decrypt_time", decryptMs,
+                    mapOf("ciphertext_size" to ciphertext.size.toString(),
+                        "plaintext_size" to result.plaintext.size.toString(),
+                        "message_type" to messageType.toString(),
+                        "peer_id" to senderId.take(8)))
 
                 // Save updated session
                 val now = currentTimeMillis()
@@ -507,6 +536,7 @@ class SignalSessionManager(
     suspend fun generatePreKeyBundle(): PreKeyBundleData = withContext(Dispatchers.Default) {
         mutex.withLock {
             checkInitialized()
+            val bundleGenStart = MetricsCollector.currentNanos()
 
             // Get latest signed prekey
             val signedPreKeyId = database.trickDatabaseQueries
@@ -548,6 +578,9 @@ class SignalSessionManager(
                 .selectKyberPreKey(kyberMaxId.toLong())
                 .executeAsOne()
             val (kyberPublic, kyberSignature) = SignalNativeBridge.kyberPreKeyRecordGetPublicKey(kyberPreKeyRecord)
+
+            val bundleGenMs = (MetricsCollector.currentNanos() - bundleGenStart) / 1_000_000.0
+            MetricsCollector.recordDuration("signal", "prekey_bundle_gen_time", bundleGenMs, emptyMap())
 
             PreKeyBundleData(
                 registrationId = registrationId,
