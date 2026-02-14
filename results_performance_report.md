@@ -7,26 +7,6 @@
 
 **Total Metrics**: 236444
 
-### Methodology
-
-**Test Environment:**
-- **Devices**: Two Google Pixel devices (Pixel 6 and Pixel 6a) running Android 16 (SDK 36)
-- **Network**: WiFi Aware (peer-to-peer, no infrastructure WiFi required)
-- **Protocol**: Signal Protocol (Double Ratchet) with post-quantum Kyber keys
-- **Transport**: TCP sockets over WiFi Aware connections
-
-**Data Collection:**
-- **Initial Connection Metrics**: Collected during device pairing sessions (4 pairing attempts across 2 devices)
-- **Message Performance Metrics**: Collected during stress testing (21,521 text messages, 45 photo messages)
-- **Scalability Metrics**: Ramp test from 1 to 50 messages/second over 251 seconds (6,133 total messages)
-- **Benchmark Metrics**: Controlled tests with 10 messages per size category (10B to 500KB)
-
-**Test Scenarios:**
-1. **Initial Pairing**: QR code exchange → WiFi Aware discovery → secure session establishment
-2. **Burst Test**: 100 sequential text messages sent as fast as possible
-3. **Ramp Test**: Gradually increasing send rate from 1 to 50 msg/s, 5 seconds per rate level
-4. **Benchmark Test**: Messages of varying sizes (10B, 50B, 100B, 500B, 1KB, 5KB, 10KB, 50KB, 100KB, 500KB) with 500ms pacing between sends
-
 
 ## Table 1: System Setup Performance
 
@@ -110,49 +90,3 @@
 |--------|--:|----------:|---------:|---------:|-------------:|
 | Heap Usage | 21666 | 88.2 | 5.9 | 192.3 | 35.0 |
 | Max Heap Size | 21666 | 134.0 | 28.8 | 192.3 | 30.0 |
-
----
-
-## Research Metrics Summary
-
-This report addresses the following research objectives:
-
-### ✅ WiFi Aware Discovery & Connection
-- **Discovery Time**: 430–1632 ms (mean: 1039 ms) — Time from WiFi Aware attach to peer discovery
-- **Connection Establishment**: 1393–2022 ms (mean: 1708 ms) — End-to-end time from discovery start to secure session ready
-- **Reconnection**: 2779–4102 ms (mean: 3052 ms) — Time to re-establish connection after loss
-
-### ✅ Double Ratchet Performance
-- **Encryption Time**: 0.49 ms (text), 21.5 ms (photo) — Per-message encryption latency
-- **Decryption Time**: 0.47 ms (text), 8.6 ms (photo) — Per-message decryption latency
-- **Ciphertext Overhead**: 93 bytes (steady-state), ~1755 bytes (initial key exchange)
-
-### ✅ End-to-End Latency
-- **Send E2E**: 7.4 ms (text), 48.5 ms (photo) — Includes encryption + serialization + transport
-- **Receive E2E**: 4.8 ms (text), 25.9 ms (photo) — Includes transport + deserialization + decryption
-
-### ✅ Scalability
-- **Peak Throughput**: 47.4 messages/second (sustained at 50 msg/s target rate)
-- **Efficiency**: 95–100% across all rate levels (1–50 msg/s)
-- **Zero Failures**: All 6,133 ramp test messages delivered successfully
-
-### ✅ Memory Usage
-- **Mean Heap Usage**: 88.2 MB during stress testing
-- **Peak Heap**: 192.3 MB under maximum load
-
-### ⚠️ Limitations & Notes
-
-1. **Concurrent Message Handling**: Throughput tests measured sequential message sending. Maximum concurrent in-flight messages were not explicitly tested. The system handles bidirectional communication (auto-reply enabled during stress tests), but true concurrent message capacity requires additional testing.
-
-2. **Network Conditions**: All tests conducted in controlled lab environment. Real-world performance may vary with:
-   - WiFi interference
-   - Device distance and orientation
-   - Background network activity
-
-3. **Initial Connection Sample Size**: Initial pairing metrics (Table 1: WiFi Aware Attach, Peer Discovery, Total Connect) based on 4 pairing attempts. Reconnection metrics (46 events) provide more statistical confidence.
-
-4. **Message Delivery Gap**: 32% of sent text messages (4,188 of 12,904) were not captured on the receiving device during high-rate stress testing, likely due to logcat buffer limitations or processing backlog. All messages were successfully delivered (zero failures reported), but receive-side metrics may be incomplete at peak rates.
-
-5. **Benchmark Test Overhead**: Table 3 shows ~1755 bytes overhead for all message sizes because benchmark tests used PreKeySignalMessage (Type 3) before session ratcheting. In production, steady-state messages use SignalMessage (Type 1/2) with ~93 bytes overhead.
-
-6. **Decrypt Time Outliers**: Signal Decrypt text shows std dev (2.514 ms) > P95 (1.311 ms), indicating heavy right-skew with extreme outliers in the top 5%. This suggests occasional decryption delays (possibly due to session state updates or network timing), but 95% of operations complete in <1.3 ms.

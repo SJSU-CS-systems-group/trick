@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Centralised, thread-safe performance metrics collector.
+ * Centralized, thread-safe performance metrics collector.
  *
  * Usage:
  * - Direct recording:  `PerformanceTracker.record(MetricEvent(...))`
