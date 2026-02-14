@@ -147,7 +147,8 @@ private fun SectionedContactsList(
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 80.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
                 )
             }
         }
@@ -168,7 +169,8 @@ private fun SectionedContactsList(
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 80.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
                 )
             }
         }

@@ -56,7 +56,7 @@ fun ContactItem(
                     modifier = Modifier
                         .size(12.dp)
                         .clip(CircleShape)
-                        .background(if (isConnected) Color(0xFF4CAF50) else Color(0xFF9E9E9E))
+                        .background(if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
                         .align(Alignment.BottomEnd)
                 )
             }
