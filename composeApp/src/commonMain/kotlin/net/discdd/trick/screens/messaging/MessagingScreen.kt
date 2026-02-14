@@ -379,26 +379,13 @@ fun MessageBubble(message: Message) {
                     if (imageBitmap != null) {
                         Image(
                                 bitmap = imageBitmap,
-                                contentDescription = message.filename ?: "Image",
+                                contentDescription = "Image",
                                 modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
                                 contentScale = ContentScale.Fit
                         )
-                        if (message.filename != null) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                    text = message.filename,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color =
-                                            when {
-                                                message.isSent ->
-                                                        MaterialTheme.colorScheme.onPrimary
-                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                            }.copy(alpha = 0.7f)
-                            )
-                        }
                     } else {
                         Text(
-                                text = "[Image: ${message.filename ?: "unknown"}]",
+                                text = "[Image]",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color =
                                         when {

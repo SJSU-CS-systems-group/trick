@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -98,7 +97,6 @@ fun ChatScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding()
                 .padding(paddingValues)
@@ -107,7 +105,7 @@ fun ChatScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isContactConnected) {
                         MaterialTheme.colorScheme.primaryContainer

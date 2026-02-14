@@ -113,7 +113,7 @@ class MessagePersistenceManager(
                     MessageMetadata(
                         shortId = shortId,
                         lastMessageAt = timestamp,
-                        lastMessagePreview = "[Image] $filename"
+                        lastMessagePreview = "Image"
                     )
                 )
 
@@ -193,7 +193,7 @@ class MessagePersistenceManager(
                     MessageMetadata(
                         shortId = shortId,
                         lastMessageAt = timestamp,
-                        lastMessagePreview = "[Image] ${filename ?: "image"}"
+                        lastMessagePreview = "Image"
                     )
                 )
 

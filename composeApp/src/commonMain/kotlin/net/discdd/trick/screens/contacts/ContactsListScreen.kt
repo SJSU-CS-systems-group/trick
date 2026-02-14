@@ -142,6 +142,7 @@ private fun SectionedContactsList(
             ) { contact ->
                 ContactItem(
                     contact = contact,
+                    isConnected = true,
                     onClick = { onContactClick(contact) }
                 )
                 HorizontalDivider(
@@ -162,6 +163,7 @@ private fun SectionedContactsList(
             ) { contact ->
                 ContactItem(
                     contact = contact,
+                    isConnected = false,
                     onClick = { onContactClick(contact) }
                 )
                 HorizontalDivider(
