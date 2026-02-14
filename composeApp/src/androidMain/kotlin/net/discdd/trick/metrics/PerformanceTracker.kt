@@ -1,17 +1,11 @@
 package net.discdd.trick.metrics
 
-import android.content.Context
 import android.os.Build
 import android.util.Log
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.math.sqrt
 
 /**
  * Centralised, thread-safe performance metrics collector.
@@ -22,7 +16,6 @@ import kotlin.math.sqrt
  * - Split timing:      `val token = PerformanceTracker.startTimer("wifi_aware", "discovery_time")`
  *                       ... later ...
  *                       `PerformanceTracker.stopTimer(token, "wifi_aware", "discovery_time")`
- * - Export:            `PerformanceTracker.exportCsv(context)`
  */
 object PerformanceTracker {
 
@@ -167,126 +160,6 @@ object PerformanceTracker {
             "connections" to activeConnections.toString()
         ))
     }
-
-    // =====================================================================
-    // Querying
-    // =====================================================================
-
-    /** Return all events, optionally filtered by category and/or name. */
-    fun getEvents(category: String? = null, name: String? = null): List<MetricEvent> {
-        return events.filter { e ->
-            (category == null || e.category == category) &&
-            (name == null || e.name == name)
-        }
-    }
-
-    /** Compute summary statistics for a specific metric. */
-    fun getSummary(category: String, name: String): MetricSummary? {
-        val matching = getEvents(category, name)
-        if (matching.isEmpty()) return null
-        val durations = matching.map { it.durationMs }.sorted()
-        val count = durations.size
-        val avg = durations.average()
-        val variance = durations.map { (it - avg) * (it - avg) }.average()
-        return MetricSummary(
-            category = category,
-            name = name,
-            count = count,
-            minMs = durations.first(),
-            maxMs = durations.last(),
-            avgMs = avg,
-            p50Ms = durations[count / 2],
-            p95Ms = durations[(count * 0.95).toInt().coerceAtMost(count - 1)],
-            stdDevMs = sqrt(variance)
-        )
-    }
-
-    /** Get summaries for all distinct (category, name) pairs. */
-    fun getAllSummaries(): List<MetricSummary> {
-        val pairs = events.map { it.category to it.name }.distinct()
-        return pairs.mapNotNull { (cat, name) -> getSummary(cat, name) }
-    }
-
-    // =====================================================================
-    // Export
-    // =====================================================================
-
-    /**
-     * Export all events to a CSV file in the app's external files directory.
-     * Falls back to internal storage if external storage is unavailable.
-     * Returns the written [File], or null on failure.
-     */
-    fun exportCsv(context: Context): File? {
-        return try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val filename = "trick_metrics_$timestamp.csv"
-            
-            // Try external storage first
-            var dir = context.getExternalFilesDir(null)
-            var file: File? = null
-            
-            if (dir != null) {
-                try {
-                    file = File(dir, filename)
-                    file.bufferedWriter().use { writer ->
-                        writer.appendLine(MetricEvent.CSV_HEADER)
-                        events.forEach { event ->
-                            writer.appendLine(event.toCsvRow())
-                        }
-                    }
-                    Log.i(TAG, "Exported ${events.size} events to external storage: ${file.absolutePath}")
-                    return file
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to write to external storage: ${e.message}, trying internal storage...")
-                }
-            } else {
-                Log.w(TAG, "External files directory is null, trying internal storage...")
-            }
-            
-            // Fallback to internal storage
-            dir = context.filesDir
-            file = File(dir, filename)
-            file.bufferedWriter().use { writer ->
-                writer.appendLine(MetricEvent.CSV_HEADER)
-                events.forEach { event ->
-                    writer.appendLine(event.toCsvRow())
-                }
-            }
-            Log.i(TAG, "Exported ${events.size} events to internal storage: ${file.absolutePath}")
-            Log.i(TAG, "Pull with: adb pull ${file.absolutePath}")
-            Log.i(TAG, "Or use: adb shell run-as net.discdd.trick cat ${file.absolutePath}")
-            file
-        } catch (e: Exception) {
-            Log.e(TAG, "CSV export failed: ${e.message}", e)
-            e.printStackTrace()
-            null
-        }
-    }
-
-    /**
-     * Export all events as a single CSV string (useful for sharing via intent or logging).
-     */
-    fun exportCsvString(): String {
-        val sb = StringBuilder()
-        sb.appendLine(MetricEvent.CSV_HEADER)
-        events.forEach { sb.appendLine(it.toCsvRow()) }
-        return sb.toString()
-    }
-
-    // =====================================================================
-    // Lifecycle
-    // =====================================================================
-
-    /** Clear all recorded events and active timers. */
-    fun clear() {
-        events.clear()
-        eventCount.set(0)
-        activeTimers.clear()
-        Log.i(TAG, "All metrics cleared")
-    }
-
-    /** Total number of events currently stored. */
-    fun size(): Int = events.size
 
     // ── Internal ─────────────────────────────────────────────────────────
 

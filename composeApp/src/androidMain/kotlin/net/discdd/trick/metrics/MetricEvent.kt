@@ -32,18 +32,3 @@ data class MetricEvent(
     }
 }
 
-/**
- * Aggregated summary of a set of metric events.
- */
-data class MetricSummary(
-    val category: String,
-    val name: String,
-    val count: Int,
-    val minMs: Double,
-    val maxMs: Double,
-    val avgMs: Double,
-    val p50Ms: Double,
-    val p95Ms: Double,
-    val stdDevMs: Double
-)
-
