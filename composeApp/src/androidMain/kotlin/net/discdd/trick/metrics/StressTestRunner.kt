@@ -363,6 +363,174 @@ class StressTestRunner(
         }
     }
 
+    /**
+     * Run a concurrent message test: measure the maximum number of in-flight messages
+     * the system can handle at once.
+     *
+     * The test works in steps:
+     * 1. Start at [startConcurrent] simultaneous messages
+     * 2. At each step, launch exactly N messages simultaneously (all at once via coroutines)
+     * 3. Wait up to [timeoutPerStepSec] seconds for all messages to complete
+     * 4. Record success/fail counts and the peak in-flight count observed
+     * 5. Increase N by [stepSize] and repeat
+     * 6. Stop when N reaches [maxConcurrent] or failure rate exceeds [failureThreshold]
+     *
+     * Metrics recorded:
+     * - `concurrent_start`: test parameters
+     * - `concurrent_step`: per-step results (target, achieved, success, fail, peak in-flight)
+     * - `concurrent_end`: overall results (max successful concurrency level)
+     *
+     * @param peerId Target peer to send messages to
+     * @param maxConcurrent Maximum concurrency level to test (default 200)
+     * @param startConcurrent Starting concurrency level (default 10)
+     * @param stepSize How much to increase concurrency each step (default 10)
+     * @param timeoutPerStepSec Max seconds to wait for each step's messages to complete (default 30)
+     * @param failureThreshold Stop if failure rate exceeds this (default 0.5 = 50%)
+     * @param bidirectional If true, enables auto-reply on the receiving device
+     */
+    fun runConcurrentMessageTest(
+        peerId: String,
+        maxConcurrent: Int = 200,
+        startConcurrent: Int = 10,
+        stepSize: Int = 10,
+        timeoutPerStepSec: Int = 30,
+        failureThreshold: Double = 0.5,
+        bidirectional: Boolean = true,
+        scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    ) {
+        if (runningJob?.isActive == true) {
+            Log.w(TAG, "Stress test already running, ignoring")
+            return
+        }
+
+        Log.i(TAG, "Starting CONCURRENT test: $startConcurrent to $maxConcurrent (step $stepSize) to ${peerId.take(8)} (bidirectional=$bidirectional)")
+
+        // Enable bidirectional mode if requested
+        if (bidirectional) {
+            wifiAwareManager.setBidirectionalStressTestMode(peerId)
+        }
+
+        PerformanceTracker.record(MetricEvent("stress_test", "concurrent_start", 0.0,
+            metadata = mapOf(
+                "peer_id" to peerId.take(8),
+                "max_concurrent" to maxConcurrent.toString(),
+                "start_concurrent" to startConcurrent.toString(),
+                "step_size" to stepSize.toString(),
+                "timeout_per_step_sec" to timeoutPerStepSec.toString(),
+                "failure_threshold" to failureThreshold.toString(),
+                "bidirectional" to bidirectional.toString()
+            )))
+
+        val overallStart = System.nanoTime()
+        var maxSuccessfulLevel = 0
+
+        runningJob = scope.launch {
+            var currentLevel = startConcurrent
+
+            while (currentLevel <= maxConcurrent && isActive) {
+                Log.i(TAG, "CONCURRENT step: launching $currentLevel simultaneous messages")
+
+                val successCount = AtomicInteger(0)
+                val failCount = AtomicInteger(0)
+                val inFlightCount = AtomicInteger(0)
+                val peakInFlight = AtomicInteger(0)
+                val stepStart = System.nanoTime()
+
+                // Launch all N messages simultaneously
+                val jobs = (1..currentLevel).map { i ->
+                    async(Dispatchers.IO) {
+                        val currentInFlight = inFlightCount.incrementAndGet()
+                        // Atomically update peak if this is the highest we've seen
+                        var peak = peakInFlight.get()
+                        while (currentInFlight > peak) {
+                            if (peakInFlight.compareAndSet(peak, currentInFlight)) break
+                            peak = peakInFlight.get()
+                        }
+
+                        try {
+                            wifiAwareManager.sendMessageToPeer(
+                                "concurrent_L${currentLevel}_m${i}_${System.currentTimeMillis()}",
+                                peerId
+                            )
+                            successCount.incrementAndGet()
+                        } catch (e: Exception) {
+                            failCount.incrementAndGet()
+                            Log.w(TAG, "Concurrent send failed at level $currentLevel, msg $i: ${e.message}")
+                        } finally {
+                            inFlightCount.decrementAndGet()
+                        }
+                    }
+                }
+
+                // Wait for all messages to complete (with timeout)
+                try {
+                    withTimeout(timeoutPerStepSec * 1000L) {
+                        jobs.forEach { it.await() }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    Log.w(TAG, "CONCURRENT step $currentLevel timed out after ${timeoutPerStepSec}s")
+                    // Count remaining as failures
+                    val timedOutCount = jobs.count { !it.isCompleted }
+                    failCount.addAndGet(timedOutCount)
+                    jobs.forEach { it.cancel() }
+                }
+
+                // Allow async sendEncryptedContent coroutines to finish
+                delay(2000)
+
+                val stepMs = (System.nanoTime() - stepStart) / 1_000_000.0
+                val totalAttempted = successCount.get() + failCount.get()
+                val failureRate = if (totalAttempted > 0) failCount.get().toDouble() / totalAttempted else 0.0
+
+                PerformanceTracker.record(MetricEvent("stress_test", "concurrent_step", stepMs,
+                    metadata = mapOf(
+                        "peer_id" to peerId.take(8),
+                        "target_concurrent" to currentLevel.toString(),
+                        "success_count" to successCount.get().toString(),
+                        "fail_count" to failCount.get().toString(),
+                        "peak_in_flight" to peakInFlight.get().toString(),
+                        "failure_rate" to "%.3f".format(failureRate),
+                        "step_duration_ms" to "%.0f".format(stepMs)
+                    )))
+
+                PerformanceTracker.recordMemorySnapshot()
+
+                Log.i(TAG, "CONCURRENT step: level=$currentLevel, success=${successCount.get()}, " +
+                    "fail=${failCount.get()}, peak_in_flight=${peakInFlight.get()}, " +
+                    "failure_rate=${"%.1f".format(failureRate * 100)}%, duration=${stepMs.toLong()}ms")
+
+                // Update max successful level if this step was acceptable
+                if (failureRate <= failureThreshold) {
+                    maxSuccessfulLevel = currentLevel
+                } else {
+                    Log.w(TAG, "Failure rate ${"%.1f".format(failureRate * 100)}% exceeds " +
+                        "threshold ${"%.0f".format(failureThreshold * 100)}% at level $currentLevel — stopping")
+                    break
+                }
+
+                currentLevel += stepSize
+            }
+
+            val totalMs = (System.nanoTime() - overallStart) / 1_000_000.0
+
+            PerformanceTracker.record(MetricEvent("stress_test", "concurrent_end", totalMs,
+                metadata = mapOf(
+                    "peer_id" to peerId.take(8),
+                    "max_successful_concurrent" to maxSuccessfulLevel.toString(),
+                    "final_level_tested" to (currentLevel - stepSize).coerceAtLeast(startConcurrent).toString()
+                )))
+
+            PerformanceTracker.recordMemorySnapshot()
+
+            // Disable bidirectional mode
+            if (bidirectional) {
+                wifiAwareManager.setBidirectionalStressTestMode(null)
+            }
+
+            Log.i(TAG, "CONCURRENT complete: max successful concurrency = $maxSuccessfulLevel in ${totalMs}ms")
+        }
+    }
+
     /** Cancel a running stress test. */
     fun cancel() {
         runningJob?.cancel()
