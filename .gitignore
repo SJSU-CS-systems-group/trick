@@ -18,3 +18,4 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 **/rust/trick-signal-ffi/.cargo/
 **/rust/trick-signal-ffi/target/
+**/rust/trick-signal-ffi/out/
