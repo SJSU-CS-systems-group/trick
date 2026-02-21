@@ -19,5 +19,5 @@ sealed class Screen(val route: String) {
             return "chat/$shortId/$encodedPeerId"
         }
     }
-    data object KeyExchange : Screen("key_exchange")
+    data object KeyDistribution : Screen("key_distribution")
 }

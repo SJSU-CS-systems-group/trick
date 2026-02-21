@@ -49,10 +49,10 @@ message ChatMessage {
   optional int32 sender_device_id = 11;      // Sender's device ID (default 1)
 }
 
-// Key exchange payload for QR code - compact binary format with full Signal bundle
+// Key distribution payload for QR code - compact binary format with full Signal bundle
 // This format uses protobuf + Base32 encoding for QR alphanumeric mode compatibility
 // Max size ~1960 bytes raw → ~3136 chars Base32 → fits in QR Version 35-40 (alphanumeric)
-message KeyExchangeBundle {
+message KeyDistributionBundle {
   // Identity layer (for signature verification)
   bytes device_id = 1;          // UUID as 16 bytes
   bytes public_key = 2;         // Ed25519 public key (32 bytes)

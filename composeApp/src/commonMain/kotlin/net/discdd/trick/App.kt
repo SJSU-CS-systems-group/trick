@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
-import net.discdd.trick.navigation.KeyExchangeContent
+import net.discdd.trick.navigation.KeyDistributionContent
 import net.discdd.trick.navigation.OnPickImageRequest
 import net.discdd.trick.navigation.TrickNavHost
 import net.discdd.trick.screens.UnsupportedDeviceScreen
@@ -23,7 +23,7 @@ fun App(
     permissionsGranted: Boolean = false,
     wifiAwareSupported: Boolean = true,
     onPickImage: OnPickImageRequest? = null,
-    keyExchangeContent: KeyExchangeContent? = null
+    keyDistributionContent: KeyDistributionContent? = null
 ) {
     var isDarkTheme by remember { mutableStateOf(true) }
     CompositionLocalProvider(
@@ -44,7 +44,7 @@ fun App(
                 wifiAwareService = wifiAwareService,
                 permissionsGranted = permissionsGranted,
                 onPickImage = onPickImage,
-                keyExchangeContent = keyExchangeContent
+                keyDistributionContent = keyDistributionContent
             )
         }
         }

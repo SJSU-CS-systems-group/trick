@@ -22,7 +22,7 @@ import javax.crypto.spec.GCMParameterSpec
  * - Private keys encrypted with hardware-backed AES-256-GCM master key
  * - Master key never leaves Android KeyStore secure hardware
  * - Public keys stored in SharedPreferences for easy access
- * - Peer keys stored per-device for key exchange tracking
+ * - Peer keys stored per-device for key distribution tracking
  */
 actual class KeyManager(private val context: Context) {
     private val libSignalManager = createLibSignalManager()

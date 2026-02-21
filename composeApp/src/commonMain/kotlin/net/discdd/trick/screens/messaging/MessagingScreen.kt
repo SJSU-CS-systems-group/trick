@@ -99,7 +99,7 @@ fun MessagingScreen(
         localDeviceId: String,
         connectedPeerIds: List<String>,
         onPickImage: (() -> Unit)? = null,
-        onNavigateToKeyExchange: (() -> Unit)? = null,
+        onNavigateToKeyDistribution: (() -> Unit)? = null,
         onNavigateToContacts: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf("") }
@@ -204,13 +204,13 @@ fun MessagingScreen(
                 }
 
                 // Action buttons row
-                if (onNavigateToKeyExchange != null) {
+                if (onNavigateToKeyDistribution != null) {
                     Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                                onClick = { onNavigateToKeyExchange() },
+                                onClick = { onNavigateToKeyDistribution() },
                                 modifier = Modifier.weight(1f)
                         ) {
                             Icon(
@@ -219,7 +219,7 @@ fun MessagingScreen(
                                     modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Key Exchange")
+                            Text("Key Distribution")
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))

@@ -206,7 +206,7 @@ private fun EmptyContactsState(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Tap + to exchange keys with a contact",
+            text = "Tap + to distribute keys with a contact",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)

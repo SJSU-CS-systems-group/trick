@@ -30,7 +30,7 @@ private data class StoredTrickContactData(
  * in the Contacts database like Android does).
  *
  * Workflow:
- * 1. After QR key exchange, caller picks a contact via IOSContactPickerScreen
+ * 1. After QR key distribution, caller picks a contact via IOSContactPickerScreen
  * 2. Caller registers the mapping via registerContactMapping()
  * 3. Caller calls linkTrickDataToContact() to persist the association
  */

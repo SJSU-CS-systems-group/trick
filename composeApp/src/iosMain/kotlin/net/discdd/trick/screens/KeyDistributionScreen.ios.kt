@@ -59,7 +59,7 @@ actual fun QRCodeView(payload: String) {
     if (imageBitmap != null) {
         Image(
             bitmap = imageBitmap!!,
-            contentDescription = "QR Code for key exchange",
+            contentDescription = "QR Code for key distribution",
             modifier = Modifier.fillMaxSize()
         )
     } else {

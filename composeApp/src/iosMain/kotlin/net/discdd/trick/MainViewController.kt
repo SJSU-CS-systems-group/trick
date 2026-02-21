@@ -82,8 +82,8 @@ fun MainViewController(
         wifiAwareService = wifiAwareService,
         permissionsGranted = signalReady,
         onPickImage = onPickImage,
-        keyExchangeContent = { deviceId, onNavigateBack ->
-            IOSKeyExchangeScreen(
+        keyDistributionContent = { deviceId, onNavigateBack ->
+            IOSKeyDistributionScreen(
                 deviceId = deviceId,
                 onNavigateBack = onNavigateBack,
                 pairingPresenter = pairingPresenter
