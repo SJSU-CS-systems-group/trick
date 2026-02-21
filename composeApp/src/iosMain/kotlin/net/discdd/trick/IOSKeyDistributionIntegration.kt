@@ -248,6 +248,11 @@ fun IOSKeyDistributionScreen(
                 )
 
                 val signalBundle = signalSessionManager.generatePreKeyBundle()
+
+                // Strip one-time prekeys so the QR code is permanent and deterministic.
+                // Signed prekey + Kyber prekey provide sufficient security.
+                val permanentBundle = signalBundle.copy(preKeyId = null, preKeyPublic = null)
+
                 val identityPayload = Json.decodeFromString<KeyDistributionPayload>(baseResult.payloadJson)
 
                 val payloads = encodePayloadForQR(
@@ -256,7 +261,7 @@ fun IOSKeyDistributionScreen(
                     timestamp = identityPayload.timestamp,
                     signatureHex = identityPayload.signatureHex,
                     shortId = baseResult.shortId,
-                    bundle = signalBundle
+                    bundle = permanentBundle
                 )
 
                 val orderedPayloads = payloads.sortedBy { payload ->

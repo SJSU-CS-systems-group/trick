@@ -9,7 +9,8 @@ import net.discdd.trick.util.ShortIdGenerator
 
 /**
  * Payload structure for QR code key distribution.
- * Contains the device ID, public key, timestamp, signature, and optional shortId for trcky.org URL.
+ * Contains the device ID, public key, timestamp (fixed at 0 for permanent QR codes),
+ * signature, and optional shortId for trcky.org URL.
  */
 @Serializable
 data class KeyDistributionPayload(
@@ -52,11 +53,10 @@ fun parseTrckyShortId(input: String): String? {
  *
  * Security features:
  * - QR codes are signed to prevent impersonation
- * - 5-minute expiration to prevent replay attacks
  * - Signature verification ensures authenticity
+ * - QR codes are permanent and deterministic (same key material → same QR code)
  */
 object QRKeyDistribution {
-    private const val QR_EXPIRATION_MS = 5 * 60 * 1000L // 5 minutes
 
     /**
      * Generate a QR code payload containing the device's public key.
@@ -64,7 +64,7 @@ object QRKeyDistribution {
      * The payload includes:
      * - Device ID
      * - Public key (hex encoded)
-     * - Timestamp (for expiration)
+     * - Timestamp (fixed at 0 for permanent, deterministic QR codes)
      * - Signature (to prevent tampering/impersonation)
      * - ShortId (for trcky.org URL)
      *
@@ -81,7 +81,7 @@ object QRKeyDistribution {
         val keyPair = keyManager.getIdentityKeyPair()
             ?: keyManager.generateIdentityKeyPair()
 
-        val timestamp = currentTimeMillis()
+        val timestamp = 0L
         val publicKeyHex = keyPair.publicKey.data.toHexString()
         val shortId = ShortIdGenerator.generateShortId(keyPair.publicKey)
 
@@ -107,9 +107,8 @@ object QRKeyDistribution {
      *
      * Verification steps:
      * 1. Parse JSON payload
-     * 2. Check timestamp expiration (5 minutes)
-     * 3. Verify signature using the peer's public key
-     * 4. Store the peer's public key if verification passes
+     * 2. Verify signature using the peer's public key
+     * 3. Store the peer's public key if verification passes
      *
      * @param payload JSON string from QR code
      * @param keyManager KeyManager to store peer's public key
@@ -123,15 +122,6 @@ object QRKeyDistribution {
     ): Pair<Boolean, String> {
         return try {
             val data = Json.decodeFromString<KeyDistributionPayload>(payload)
-
-            // Verify timestamp (5-minute expiration)
-            val now = currentTimeMillis()
-            if (now - data.timestamp > QR_EXPIRATION_MS) {
-                return Pair(false, "QR code expired (older than 5 minutes)")
-            }
-            if (data.timestamp > now + 60_000) { // Allow 1 minute clock skew
-                return Pair(false, "QR code has invalid future timestamp")
-            }
 
             // Decode hex strings
             val publicKeyBytes = data.publicKeyHex.hexToByteArray()
@@ -159,11 +149,6 @@ object QRKeyDistribution {
     }
 
 }
-
-/**
- * Get current time in milliseconds (platform-specific).
- */
-internal expect fun currentTimeMillis(): Long
 
 /**
  * Convert ByteArray to hex string.

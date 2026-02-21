@@ -137,10 +137,3 @@ actual class KeyManager {
         return userDefaults.dataForKey("$PEER_KEY_PREFIX$peerId") != null
     }
 }
-
-/**
- * iOS implementation of currentTimeMillis.
- */
-internal actual fun currentTimeMillis(): Long {
-    return net.discdd.trick.data.currentTimeMillis()
-}

@@ -278,6 +278,10 @@ fun AndroidKeyDistributionScreen(
             // Get the full Signal prekey bundle (including Kyber)
             val signalBundle = signalSessionManager.generatePreKeyBundle()
 
+            // Strip one-time prekeys so the QR code is permanent and deterministic.
+            // Signed prekey + Kyber prekey provide sufficient security.
+            val permanentBundle = signalBundle.copy(preKeyId = null, preKeyPublic = null)
+
             // Parse the base result to get identity fields
             val identityPayload = Json.decodeFromString<KeyDistributionPayload>(baseResult.payloadJson)
 
@@ -288,7 +292,7 @@ fun AndroidKeyDistributionScreen(
                 timestamp = identityPayload.timestamp,
                 signatureHex = identityPayload.signatureHex,
                 shortId = baseResult.shortId,
-                bundle = signalBundle
+                bundle = permanentBundle
             )
 
             Log.d("KeyDistribution", "Generated ${qrPayloads.size} QR codes")

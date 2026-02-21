@@ -170,8 +170,3 @@ actual class KeyManager(private val context: Context) {
         return prefs.contains("$PEER_KEY_PREFIX$peerId")
     }
 }
-
-/**
- * Android implementation of currentTimeMillis.
- */
-internal actual fun currentTimeMillis(): Long = System.currentTimeMillis()
