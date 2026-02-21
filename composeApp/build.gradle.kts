@@ -61,12 +61,6 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.material3)
                 implementation(compose.ui)
-                // REMOVE these three lines from here:
-                // implementation(compose.preview)
-                // implementation(compose.components.resources)
-                // implementation(compose.components.uiToolingPreview)
-
-                // Keep resources (it’s multiplatform-safe)
                 implementation(compose.components.resources)
 
                 implementation(libs.navigation.compose)
@@ -200,32 +194,22 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-// Rust FFI build task for Android
-// Run with: ./gradlew buildRustAndroid
+// Rust FFI build task for Android — run with: ./gradlew buildRustAndroid
+val cargoHome = System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"
+val cargoBin = "$cargoHome/bin/cargo"
+
 tasks.register<Exec>("buildRustAndroid") {
     workingDir = file("../rust/trick-signal-ffi")
     environment("ANDROID_NDK_HOME", System.getenv("ANDROID_NDK_HOME") ?: "")
-    commandLine("cargo", "ndk",
+    commandLine(cargoBin, "ndk",
         "-t", "aarch64-linux-android",
         "-t", "x86_64-linux-android",
         "-o", "${project.projectDir}/src/androidMain/jniLibs",
         "build", "--release"
     )
-    // Ensure NDK r28+ is used for 16 KB alignment support
-    doFirst {
-        val ndkHome = System.getenv("ANDROID_NDK_HOME")
-        if (ndkHome == null || ndkHome.isEmpty()) {
-            throw GradleException(
-                "ANDROID_NDK_HOME is not set. " +
-                "Please set it to NDK r28.0.12682487 or later for 16 KB alignment support. " +
-                "Example: export ANDROID_NDK_HOME=\$HOME/Library/Android/sdk/ndk/29.0.14206865"
-            )
-        }
-    }
 }
 
-// Wire Rust build to Android build (optional - enable when Rust toolchain is set up)
-// tasks.named("preBuild") { dependsOn("buildRustAndroid") }
+// iOS Rust FFI: use rust/trick-signal-ffi/build-ios.sh
 
 sqldelight {
     databases {

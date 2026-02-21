@@ -4,6 +4,8 @@ package net.discdd.trick.screens
 
 import android.Manifest
 import android.util.Log
+import android.util.Size
+import android.view.MotionEvent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -26,7 +28,10 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.io.encoding.Base64
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * QR Code Scanner screen using CameraX and ML Kit
@@ -94,9 +99,35 @@ private fun CameraPreviewWithScanner(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var hasScanned by remember { mutableStateOf(false) }
 
+    // Hold references to camera and preview for focus control
+    var cameraRef by remember { mutableStateOf<Camera?>(null) }
+    var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
+
+    // Periodically re-trigger center autofocus to help cameras that struggle at close range
+    // (e.g. Pixel 6's large sensor has trouble locking focus on near objects).
+    // This nudges the AF system every 1.5s so it keeps trying to find the QR code.
+    LaunchedEffect(cameraRef, previewViewRef) {
+        val cam = cameraRef ?: return@LaunchedEffect
+        val pv = previewViewRef ?: return@LaunchedEffect
+        while (isActive) {
+            delay(1500)
+            try {
+                val factory = pv.meteringPointFactory
+                val center = factory.createPoint(0.5f, 0.5f)
+                val action = FocusMeteringAction.Builder(center, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                    .setAutoCancelDuration(1, TimeUnit.SECONDS)
+                    .build()
+                cam.cameraControl.startFocusAndMetering(action)
+            } catch (e: Exception) {
+                Log.d("QRScanner", "Periodic AF retrigger failed: ${e.message}")
+            }
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             val previewView = PreviewView(ctx)
+            previewViewRef = previewView
             val executor = ContextCompat.getMainExecutor(ctx)
 
             cameraProviderFuture.addListener({
@@ -108,8 +139,11 @@ private fun CameraPreviewWithScanner(
                 }
 
                 // Image analysis for QR scanning
+                // Use 1280x720 target resolution — plenty for QR codes,
+                // avoids wasting cycles on high-res frames from large sensors (e.g. Pixel 6 50MP)
                 val imageAnalyzer = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setTargetResolution(Size(1280, 720))
                     .build()
                     .also { analysis ->
                         analysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
@@ -131,12 +165,18 @@ private fun CameraPreviewWithScanner(
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    val camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
                         preview,
                         imageAnalyzer
                     )
+                    cameraRef = camera
+
+                    // Enable tap-to-focus: user can tap the preview to force AF at that point.
+                    // Critical for Pixel 6 and other large-sensor devices that struggle with
+                    // close-range autofocus — gives the user manual control to lock focus.
+                    setupTapToFocus(previewView, camera)
                 } catch (e: Exception) {
                     Log.e("QRScanner", "Camera binding failed", e)
                 }
@@ -162,11 +202,21 @@ private fun CameraPreviewWithScanner(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (hasScanned) "✓ Scanned!" else "Position QR code here",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (hasScanned) "✓ Scanned!" else "Position QR code here",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (!hasScanned) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tap to focus if blurry",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -265,9 +315,35 @@ private fun MultiCameraPreviewWithScanner(
         }
     }
 
+    // Hold references to camera and preview for focus control
+    var cameraRef by remember { mutableStateOf<Camera?>(null) }
+    var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
+
+    // Periodically re-trigger center autofocus to help cameras that struggle at close range
+    // (e.g. Pixel 6's large sensor has trouble locking focus on near objects).
+    // This nudges the AF system every 1.5s so it keeps trying to find the QR code.
+    LaunchedEffect(cameraRef, previewViewRef) {
+        val cam = cameraRef ?: return@LaunchedEffect
+        val pv = previewViewRef ?: return@LaunchedEffect
+        while (isActive) {
+            delay(1500)
+            try {
+                val factory = pv.meteringPointFactory
+                val center = factory.createPoint(0.5f, 0.5f)
+                val action = FocusMeteringAction.Builder(center, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                    .setAutoCancelDuration(1, TimeUnit.SECONDS)
+                    .build()
+                cam.cameraControl.startFocusAndMetering(action)
+            } catch (e: Exception) {
+                Log.d("QRScanner", "Periodic AF retrigger failed: ${e.message}")
+            }
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             val previewView = PreviewView(ctx)
+            previewViewRef = previewView
             val executor = ContextCompat.getMainExecutor(ctx)
 
             cameraProviderFuture.addListener({
@@ -279,8 +355,11 @@ private fun MultiCameraPreviewWithScanner(
                 }
 
                 // Image analysis for QR scanning
+                // Use 1280x720 target resolution — plenty for QR codes,
+                // avoids wasting cycles on high-res frames from large sensors (e.g. Pixel 6 50MP)
                 val imageAnalyzer = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setTargetResolution(Size(1280, 720))
                     .build()
                     .also { analysis ->
                         analysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
@@ -297,12 +376,18 @@ private fun MultiCameraPreviewWithScanner(
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    val camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
                         preview,
                         imageAnalyzer
                     )
+                    cameraRef = camera
+
+                    // Enable tap-to-focus: user can tap the preview to force AF at that point.
+                    // Critical for Pixel 6 and other large-sensor devices that struggle with
+                    // close-range autofocus — gives the user manual control to lock focus.
+                    setupTapToFocus(previewView, camera)
                 } catch (e: Exception) {
                     Log.e("QRScanner", "Camera binding failed", e)
                 }
@@ -331,11 +416,19 @@ private fun MultiCameraPreviewWithScanner(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Position QR code here",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Position QR code here",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tap to focus if blurry",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
 
@@ -368,6 +461,37 @@ private fun MultiCameraPreviewWithScanner(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Sets up tap-to-focus on the PreviewView.
+ *
+ * When the user taps anywhere on the camera preview, this triggers autofocus (AF) and
+ * auto-exposure (AE) metering at the tapped point. This is especially important for
+ * devices with large camera sensors (like the Pixel 6) that struggle to autofocus on
+ * close-range objects like QR codes — tapping gives the user direct control to force
+ * the camera to re-evaluate focus at the correct distance.
+ */
+@Suppress("ClickableViewAccessibility")
+private fun setupTapToFocus(previewView: PreviewView, camera: Camera) {
+    previewView.setOnTouchListener { _, event ->
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            try {
+                val factory = previewView.meteringPointFactory
+                val point = factory.createPoint(event.x, event.y)
+                val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                    .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                    .build()
+                camera.cameraControl.startFocusAndMetering(action)
+                Log.d("QRScanner", "Tap-to-focus triggered at (${event.x}, ${event.y})")
+            } catch (e: Exception) {
+                Log.d("QRScanner", "Tap-to-focus failed: ${e.message}")
+            }
+            true
+        } else {
+            false
         }
     }
 }
