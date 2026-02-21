@@ -35,9 +35,9 @@
 
 | Phase | Content Type | Count | Mean Overhead (bytes) | Min | Max |
 |-------|-------------|--:|---------------------:|----:|----:|
-| Initial (key exchange) | text | 98 | 1754 | 1746 | 1757 |
+| Initial (key distribution) | text | 98 | 1754 | 1746 | 1757 |
 | Steady-state | text | 21476 | 93 | 58 | 103 |
-| Initial (key exchange) | photo | 39 | 1755 | 1754 | 1756 |
+| Initial (key distribution) | photo | 39 | 1755 | 1754 | 1756 |
 | Steady-state | photo | 4 | 98 | 94 | 103 |
 
 *Note: The first message in a Signal Protocol session includes key material, causing ~1754 bytes of overhead. Subsequent messages have only ~93 bytes overhead.*

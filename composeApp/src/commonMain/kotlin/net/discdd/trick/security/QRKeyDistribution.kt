@@ -8,11 +8,12 @@ import net.discdd.trick.libsignal.PublicKey
 import net.discdd.trick.util.ShortIdGenerator
 
 /**
- * Payload structure for QR code key exchange.
- * Contains the device ID, public key, timestamp, signature, and optional shortId for trcky.org URL.
+ * Payload structure for QR code key distribution.
+ * Contains the device ID, public key, timestamp (fixed at 0 for permanent QR codes),
+ * signature, and optional shortId for trcky.org URL.
  */
 @Serializable
-data class KeyExchangePayload(
+data class KeyDistributionPayload(
     val deviceId: String,
     val publicKeyHex: String,
     val timestamp: Long,
@@ -23,12 +24,12 @@ data class KeyExchangePayload(
 /**
  * Result of generating a QR payload, including the JSON and shortId for building the display URL.
  */
-data class KeyExchangeQRResult(
+data class KeyDistributionQRResult(
     val payloadJson: String,
     val shortId: String
 )
 
-/** Base URL for trcky.org key exchange links (align with Contact.getUrl()). */
+/** Base URL for trcky.org key distribution links (align with Contact.getUrl()). */
 const val TRCKY_ORG_BASE_URL = "https://trcky.org"
 
 /**
@@ -48,15 +49,14 @@ fun parseTrckyShortId(input: String): String? {
 }
 
 /**
- * QRKeyExchange handles the generation and verification of QR codes for key exchange.
+ * QRKeyDistribution handles the generation and verification of QR codes for key distribution.
  *
  * Security features:
  * - QR codes are signed to prevent impersonation
- * - 5-minute expiration to prevent replay attacks
  * - Signature verification ensures authenticity
+ * - QR codes are permanent and deterministic (same key material → same QR code)
  */
-object QRKeyExchange {
-    private const val QR_EXPIRATION_MS = 5 * 60 * 1000L // 5 minutes
+object QRKeyDistribution {
 
     /**
      * Generate a QR code payload containing the device's public key.
@@ -64,24 +64,24 @@ object QRKeyExchange {
      * The payload includes:
      * - Device ID
      * - Public key (hex encoded)
-     * - Timestamp (for expiration)
+     * - Timestamp (fixed at 0 for permanent, deterministic QR codes)
      * - Signature (to prevent tampering/impersonation)
      * - ShortId (for trcky.org URL)
      *
      * @param keyManager KeyManager to retrieve identity key pair
      * @param libSignalManager LibSignalManager for signing
      * @param deviceId The device's unique identifier
-     * @return KeyExchangeQRResult with payloadJson and shortId for display URL
+     * @return KeyDistributionQRResult with payloadJson and shortId for display URL
      */
     fun generateQRPayload(
         keyManager: KeyManager,
         libSignalManager: LibSignalManager,
         deviceId: String
-    ): KeyExchangeQRResult {
+    ): KeyDistributionQRResult {
         val keyPair = keyManager.getIdentityKeyPair()
             ?: keyManager.generateIdentityKeyPair()
 
-        val timestamp = currentTimeMillis()
+        val timestamp = 0L
         val publicKeyHex = keyPair.publicKey.data.toHexString()
         val shortId = ShortIdGenerator.generateShortId(keyPair.publicKey)
 
@@ -90,7 +90,7 @@ object QRKeyExchange {
         val signature = libSignalManager.sign(keyPair.privateKey, dataToSign)
         val signatureHex = signature.toHexString()
 
-        val payload = KeyExchangePayload(
+        val payload = KeyDistributionPayload(
             deviceId = deviceId,
             publicKeyHex = publicKeyHex,
             timestamp = timestamp,
@@ -99,7 +99,7 @@ object QRKeyExchange {
         )
 
         val payloadJson = Json.encodeToString(payload)
-        return KeyExchangeQRResult(payloadJson = payloadJson, shortId = shortId)
+        return KeyDistributionQRResult(payloadJson = payloadJson, shortId = shortId)
     }
 
     /**
@@ -107,9 +107,8 @@ object QRKeyExchange {
      *
      * Verification steps:
      * 1. Parse JSON payload
-     * 2. Check timestamp expiration (5 minutes)
-     * 3. Verify signature using the peer's public key
-     * 4. Store the peer's public key if verification passes
+     * 2. Verify signature using the peer's public key
+     * 3. Store the peer's public key if verification passes
      *
      * @param payload JSON string from QR code
      * @param keyManager KeyManager to store peer's public key
@@ -122,16 +121,7 @@ object QRKeyExchange {
         libSignalManager: LibSignalManager
     ): Pair<Boolean, String> {
         return try {
-            val data = Json.decodeFromString<KeyExchangePayload>(payload)
-
-            // Verify timestamp (5-minute expiration)
-            val now = currentTimeMillis()
-            if (now - data.timestamp > QR_EXPIRATION_MS) {
-                return Pair(false, "QR code expired (older than 5 minutes)")
-            }
-            if (data.timestamp > now + 60_000) { // Allow 1 minute clock skew
-                return Pair(false, "QR code has invalid future timestamp")
-            }
+            val data = Json.decodeFromString<KeyDistributionPayload>(payload)
 
             // Decode hex strings
             val publicKeyBytes = data.publicKeyHex.hexToByteArray()
@@ -152,18 +142,13 @@ object QRKeyExchange {
             // Store peer's public key
             keyManager.storePeerPublicKey(data.deviceId, publicKey)
 
-            Pair(true, "Successfully exchanged keys with ${data.deviceId}")
+            Pair(true, "Successfully distributed keys with ${data.deviceId}")
         } catch (e: Exception) {
             Pair(false, "Failed to parse QR code: ${e.message}")
         }
     }
 
 }
-
-/**
- * Get current time in milliseconds (platform-specific).
- */
-internal expect fun currentTimeMillis(): Long
 
 /**
  * Convert ByteArray to hex string.
@@ -187,13 +172,13 @@ fun String.hexToByteArray(): ByteArray {
 }
 
 // ============================================================
-// SIGNAL PROTOCOL KEY EXCHANGE (New)
+// SIGNAL PROTOCOL KEY DISTRIBUTION (New)
 // ============================================================
 
 /**
  * Result of Signal-based QR generation.
  */
-data class SignalKeyExchangeQRResult(
+data class SignalKeyDistributionQRResult(
     val payloadJson: String,
     val shortId: String,
     val bundleUploaded: Boolean

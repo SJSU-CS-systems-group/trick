@@ -7,7 +7,7 @@ A Kotlin Multiplatform messaging application for Android and iOS that enables pe
 - Peer-to-peer messaging over WiFi Aware
 - End-to-end encryption using Signal Protocol
 - Text and image messaging
-- QR code-based key exchange
+- QR code-based key distribution
 
 ## Project Structure
 

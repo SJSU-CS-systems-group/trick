@@ -35,10 +35,10 @@ import net.discdd.trick.util.urlDecode
 import org.koin.compose.koinInject
 
 /**
- * Optional: when non-null, platform provides a composable for the Key Exchange screen
- * (e.g. AndroidKeyExchangeScreen). When null, a simple placeholder is shown.
+ * Optional: when non-null, platform provides a composable for the Key Distribution screen
+ * (e.g. AndroidKeyDistributionScreen). When null, a simple placeholder is shown.
  */
-typealias KeyExchangeContent = @Composable (deviceId: String, onNavigateBack: () -> Unit) -> Unit
+typealias KeyDistributionContent = @Composable (deviceId: String, onNavigateBack: () -> Unit) -> Unit
 
 /**
  * Optional: when user taps "pick image", TrickNavHost calls this with a callback.
@@ -53,7 +53,7 @@ fun TrickNavHost(
     wifiAwareService: WifiAwareService,
     permissionsGranted: Boolean,
     onPickImage: OnPickImageRequest? = null,
-    keyExchangeContent: KeyExchangeContent? = null
+    keyDistributionContent: KeyDistributionContent? = null
 ) {
     val messagePersistenceManager: MessagePersistenceManager = koinInject()
     val signalSessionManager: SignalSessionManager = koinInject()
@@ -175,7 +175,7 @@ fun TrickNavHost(
                     navController.navigate(Screen.Chat.createRoute(contact.shortId, peerId))
                 },
                 onAddContactClick = {
-                    navController.navigate(Screen.KeyExchange.route)
+                    navController.navigate(Screen.KeyDistribution.route)
                 },
                 connectedPeerIds = connectedPeerIds.toList(),
                 onTestMessagingClick = {
@@ -248,11 +248,11 @@ fun TrickNavHost(
             )
         }
 
-        composable(Screen.KeyExchange.route) {
-            if (keyExchangeContent != null) {
-                keyExchangeContent(localDeviceId.value) { navController.popBackStack() }
+        composable(Screen.KeyDistribution.route) {
+            if (keyDistributionContent != null) {
+                keyDistributionContent(localDeviceId.value) { navController.popBackStack() }
             } else {
-                KeyExchangePlaceholder(onNavigateBack = { navController.popBackStack() })
+                KeyDistributionPlaceholder(onNavigateBack = { navController.popBackStack() })
             }
         }
     }
@@ -260,11 +260,11 @@ fun TrickNavHost(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KeyExchangePlaceholder(onNavigateBack: () -> Unit) {
+private fun KeyDistributionPlaceholder(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Key Exchange") },
+                title = { Text("Key Distribution") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -275,7 +275,7 @@ private fun KeyExchangePlaceholder(onNavigateBack: () -> Unit) {
         }
     ) { paddingValues ->
         Text(
-            text = "Key Exchange",
+            text = "Key Distribution",
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)

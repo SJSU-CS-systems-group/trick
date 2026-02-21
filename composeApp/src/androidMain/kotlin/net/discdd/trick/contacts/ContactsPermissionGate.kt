@@ -102,7 +102,7 @@ private fun PermissionRequestUI(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Trick needs access to your contacts to link exchanged keys with your contacts. Your contact data stays on your device.",
+            text = "Trick needs access to your contacts to link distributed keys with your contacts. Your contact data stays on your device.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)

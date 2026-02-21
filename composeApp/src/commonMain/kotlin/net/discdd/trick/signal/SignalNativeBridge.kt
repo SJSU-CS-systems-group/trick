@@ -116,7 +116,7 @@ expect object SignalNativeBridge {
     fun kyberPreKeyRecordGetPublicKey(record: ByteArray): Pair<ByteArray, ByteArray>
 
     // =========================================================================
-    // EC Operations (for QR key exchange, etc.)
+    // EC Operations (for QR key distribution, etc.)
     // =========================================================================
 
     /** Sign data with an EC private key. Returns signature bytes. */

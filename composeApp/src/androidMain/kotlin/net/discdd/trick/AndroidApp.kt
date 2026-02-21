@@ -67,8 +67,8 @@ fun AndroidApp(
                             )
                         )
                     },
-                    keyExchangeContent = { deviceId, onNavigateBack ->
-                        AndroidKeyExchangeScreen(
+                    keyDistributionContent = { deviceId, onNavigateBack ->
+                        AndroidKeyDistributionScreen(
                             context = context,
                             deviceId = deviceId,
                             onNavigateBack = onNavigateBack

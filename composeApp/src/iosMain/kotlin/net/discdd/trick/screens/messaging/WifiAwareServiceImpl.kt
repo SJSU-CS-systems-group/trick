@@ -204,7 +204,7 @@ class WifiAwareServiceImpl(
             } catch (e: SignalError.NoSession) {
                 withContext(Dispatchers.Main) {
                     notifySystemMessage(
-                        "[Error] Secure session not established. Exchange QR codes first.",
+                        "[Error] Secure session not established. Do key distribution first.",
                         peerId
                     )
                 }

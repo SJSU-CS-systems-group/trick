@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * KeyExchangeScreen provides UI for QR code key exchange.
+ * KeyDistributionScreen provides UI for QR code key distribution.
  *
  * Features:
  * - Display QR codes containing device's public key (may be split across multiple codes)
@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeyExchangeScreen(
+fun KeyDistributionScreen(
     deviceId: String,
     qrCodePayloads: List<String>,
     displayUrl: String,
@@ -41,7 +41,7 @@ fun KeyExchangeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Key Exchange") },
+                title = { Text("Key Distribution") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, "Back")
@@ -279,7 +279,7 @@ fun TrustedPeerItem(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "Keys exchanged",
+                text = "Keys distributed",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

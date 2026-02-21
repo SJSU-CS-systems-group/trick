@@ -18,14 +18,14 @@ import net.discdd.trick.contacts.ContactPickerResult
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.contacts.rememberContactPickerLauncher
 import net.discdd.trick.libsignal.createLibSignalManager
-import net.discdd.trick.messaging.KeyExchangeBundle
-import net.discdd.trick.screens.KeyExchangeScreen
+import net.discdd.trick.messaging.KeyDistributionBundle
+import net.discdd.trick.screens.KeyDistributionScreen
 import net.discdd.trick.screens.MultiQRScannerScreen
 import net.discdd.trick.screens.QRScannerScreen
-import net.discdd.trick.security.KeyExchangePayload
-import net.discdd.trick.security.KeyExchangeQRResult
+import net.discdd.trick.security.KeyDistributionPayload
+import net.discdd.trick.security.KeyDistributionQRResult
 import net.discdd.trick.security.KeyManager
-import net.discdd.trick.security.QRKeyExchange
+import net.discdd.trick.security.QRKeyDistribution
 import net.discdd.trick.security.TRCKY_ORG_BASE_URL
 import net.discdd.trick.signal.PreKeyBundleData
 import net.discdd.trick.signal.SignalSessionManager
@@ -45,17 +45,17 @@ private fun ByteArray.toHexString(): String {
 }
 
 /**
- * Create a KeyExchangeBundle protobuf from identity payload and Signal prekey bundle.
+ * Create a KeyDistributionBundle protobuf from identity payload and Signal prekey bundle.
  */
-private fun createKeyExchangeBundle(
+private fun createKeyDistributionBundle(
     deviceId: String,
     publicKeyHex: String,
     timestamp: Long,
     signatureHex: String,
     shortId: String,
     bundle: PreKeyBundleData
-): KeyExchangeBundle {
-    return KeyExchangeBundle(
+): KeyDistributionBundle {
+    return KeyDistributionBundle(
         device_id = deviceId.toByteArray(Charsets.UTF_8).toByteString(),
         public_key = publicKeyHex.hexToBytes().toByteString(),
         timestamp = timestamp,
@@ -78,7 +78,7 @@ private fun createKeyExchangeBundle(
 }
 
 /**
- * Encode a full key exchange payload (with Signal bundle) for QR codes.
+ * Encode a full key distribution payload (with Signal bundle) for QR codes.
  * Splits data into multiple QR codes for easier scanning.
  *
  * Each chunk format: [part_number (1 byte), total_parts (1 byte), ...data...]
@@ -103,7 +103,7 @@ private fun encodePayloadForQR(
     shortId: String,
     bundle: PreKeyBundleData
 ): List<String> {
-    val protoBundle = createKeyExchangeBundle(
+    val protoBundle = createKeyDistributionBundle(
         deviceId = deviceId,
         publicKeyHex = publicKeyHex,
         timestamp = timestamp,
@@ -114,7 +114,7 @@ private fun encodePayloadForQR(
 
     val protoBytes = protoBundle.encode()
     val totalSize = protoBytes.size
-    Log.d("KeyExchange", "Protobuf size: $totalSize bytes (before QR chunking)")
+    Log.d("KeyDistribution", "Protobuf size: $totalSize bytes (before QR chunking)")
 
     // Decide how many QR parts we need (1 or 2), and corresponding chunk size.
     val (chunks, totalParts) = if (totalSize <= TARGET_SINGLE_QR_BYTES) {
@@ -139,12 +139,12 @@ private fun encodePayloadForQR(
         normalizedChunks to normalizedChunks.size
     }
 
-    Log.d("KeyExchange", "Encoding into $totalParts QR part(s)")
+    Log.d("KeyDistribution", "Encoding into $totalParts QR part(s)")
 
     return chunks.mapIndexed { index, chunk ->
         val partNumber = index + 1
         val chunkWithHeader = byteArrayOf(partNumber.toByte(), totalParts.toByte()) + chunk.toByteArray()
-        Log.d("KeyExchange", "QR part $partNumber/$totalParts: ${chunkWithHeader.size} bytes")
+        Log.d("KeyDistribution", "QR part $partNumber/$totalParts: ${chunkWithHeader.size} bytes")
         Base64.Default.encode(chunkWithHeader)
     }
 }
@@ -163,13 +163,13 @@ private fun parseQRChunk(data: String): Triple<Int, Int, ByteArray> {
 
 /**
  * Decode reassembled QR payload (raw Protobuf bytes) back to components.
- * Returns Pair of (KeyExchangePayload, PreKeyBundleData).
+ * Returns Pair of (KeyDistributionPayload, PreKeyBundleData).
  */
-private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyExchangePayload, PreKeyBundleData> {
-    val bundle = KeyExchangeBundle.ADAPTER.decode(protoBytes)
+private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyDistributionPayload, PreKeyBundleData> {
+    val bundle = KeyDistributionBundle.ADAPTER.decode(protoBytes)
 
     // Extract identity payload
-    val payload = KeyExchangePayload(
+    val payload = KeyDistributionPayload(
         deviceId = String(bundle.device_id.toByteArray(), Charsets.UTF_8),
         publicKeyHex = bundle.public_key.toByteArray().toHexString(),
         timestamp = bundle.timestamp,
@@ -215,19 +215,19 @@ private data class MultiQRResult(
 )
 
 /**
- * Pending key exchange data waiting for contact selection.
+ * Pending key distribution data waiting for contact selection.
  */
-private data class PendingKeyExchange(
+private data class PendingKeyDistribution(
     val deviceId: String,
     val publicKeyHex: String,
     val shortId: String
 )
 
 /**
- * Android wrapper for KeyExchangeScreen with KeyManager integration
+ * Android wrapper for KeyDistributionScreen with KeyManager integration
  */
 @Composable
-fun AndroidKeyExchangeScreen(
+fun AndroidKeyDistributionScreen(
     context: Context,
     deviceId: String,
     onNavigateBack: () -> Unit
@@ -242,8 +242,8 @@ fun AndroidKeyExchangeScreen(
     var showScanner by remember { mutableStateOf(false) }
     var trustedPeers by rememberSaveable { mutableStateOf(emptyList<String>()) }
 
-    // State for pending key exchange (waiting for contact selection)
-    var pendingKeyExchange by remember { mutableStateOf<PendingKeyExchange?>(null) }
+    // State for pending key distribution (waiting for contact selection)
+    var pendingKeyDistribution by remember { mutableStateOf<PendingKeyDistribution?>(null) }
 
     // State for accumulating scanned QR chunks
     var scannedChunks by remember { mutableStateOf<MutableMap<Int, ByteArray>>(mutableMapOf()) }
@@ -269,7 +269,7 @@ fun AndroidKeyExchangeScreen(
             signalSessionManager.replenishPreKeysIfNeeded()
 
             // Get identity info for signature
-            val baseResult = QRKeyExchange.generateQRPayload(
+            val baseResult = QRKeyDistribution.generateQRPayload(
                 keyManager = keyManager,
                 libSignalManager = libSignalManager,
                 deviceId = deviceId
@@ -278,8 +278,12 @@ fun AndroidKeyExchangeScreen(
             // Get the full Signal prekey bundle (including Kyber)
             val signalBundle = signalSessionManager.generatePreKeyBundle()
 
+            // Strip one-time prekeys so the QR code is permanent and deterministic.
+            // Signed prekey + Kyber prekey provide sufficient security.
+            val permanentBundle = signalBundle.copy(preKeyId = null, preKeyPublic = null)
+
             // Parse the base result to get identity fields
-            val identityPayload = Json.decodeFromString<KeyExchangePayload>(baseResult.payloadJson)
+            val identityPayload = Json.decodeFromString<KeyDistributionPayload>(baseResult.payloadJson)
 
             // Create QR payloads (split into multiple QR codes)
             val qrPayloads = encodePayloadForQR(
@@ -288,10 +292,10 @@ fun AndroidKeyExchangeScreen(
                 timestamp = identityPayload.timestamp,
                 signatureHex = identityPayload.signatureHex,
                 shortId = baseResult.shortId,
-                bundle = signalBundle
+                bundle = permanentBundle
             )
 
-            Log.d("KeyExchange", "Generated ${qrPayloads.size} QR codes")
+            Log.d("KeyDistribution", "Generated ${qrPayloads.size} QR codes")
 
             // Ensure QR codes are in deterministic order (1..N) based on embedded part numbers.
             // This guards against any accidental reordering so the UI always shows 1 -> 2 -> 3.
@@ -314,7 +318,7 @@ fun AndroidKeyExchangeScreen(
 
     // Contact picker launcher
     val launchContactPicker = rememberContactPickerLauncher { result: ContactPickerResult? ->
-        val pending = pendingKeyExchange
+        val pending = pendingKeyDistribution
         if (result != null && pending != null) {
             // Link the key data to the selected contact (including deviceId for WiFi Aware matching)
             val success = nativeContactsManager.linkTrickDataToContact(
@@ -345,7 +349,7 @@ fun AndroidKeyExchangeScreen(
                 Toast.LENGTH_SHORT
             ).show()
         }
-        pendingKeyExchange = null
+        pendingKeyDistribution = null
     }
 
     if (showScanner) {
@@ -367,7 +371,7 @@ fun AndroidKeyExchangeScreen(
                     val chunkResult: Triple<Int, Int, ByteArray> = try {
                         parseQRChunk(qrCode)
                     } catch (e: Exception) {
-                        Log.e("KeyExchange", "Failed to parse QR chunk: ${e.message}")
+                        Log.e("KeyDistribution", "Failed to parse QR chunk: ${e.message}")
                         withContext(Dispatchers.Main) {
                             Toast.makeText(localContext, "Invalid QR code format", Toast.LENGTH_LONG).show()
                         }
@@ -375,7 +379,7 @@ fun AndroidKeyExchangeScreen(
                     }
                     val (partNumber, totalParts, chunkData) = chunkResult
 
-                    Log.d("KeyExchange", "Scanned part $partNumber of $totalParts")
+                    Log.d("KeyDistribution", "Scanned part $partNumber of $totalParts")
 
                     // Update state, check completion, and capture chunks for reassembly
                     val (allPartsReceived, chunksForReassembly) = withContext(Dispatchers.Main) {
@@ -409,18 +413,18 @@ fun AndroidKeyExchangeScreen(
                     // Reassemble the payload
                     val reassembled = chunksForReassembly
                     if (reassembled.size != totalParts) {
-                        Log.e("KeyExchange", "Missing chunks after reassembly")
+                        Log.e("KeyDistribution", "Missing chunks after reassembly")
                         return@launch
                     }
 
                     val protoBytes = reassembled.fold(byteArrayOf()) { acc, bytes -> acc + bytes }
-                    Log.d("KeyExchange", "Reassembled payload: ${protoBytes.size} bytes")
+                    Log.d("KeyDistribution", "Reassembled payload: ${protoBytes.size} bytes")
 
                     // Decode the reassembled payload
                     val (decodedPayload, bundleData) = try {
                         decodePayloadFromQR(protoBytes)
                     } catch (e: Exception) {
-                        Log.e("KeyExchange", "Failed to decode QR payload: ${e.message}")
+                        Log.e("KeyDistribution", "Failed to decode QR payload: ${e.message}")
                         withContext(Dispatchers.Main) {
                             Toast.makeText(localContext, "Invalid QR code format", Toast.LENGTH_LONG).show()
                             showScanner = false
@@ -428,11 +432,11 @@ fun AndroidKeyExchangeScreen(
                         return@launch
                     }
 
-                    // Convert to JSON for QRKeyExchange verification
+                    // Convert to JSON for QRKeyDistribution verification
                     val payload = Json.encodeToString(decodedPayload)
 
                     // Verify signature and store peer public key
-                    val (success, message) = QRKeyExchange.verifyAndStoreQRPayload(
+                    val (success, message) = QRKeyDistribution.verifyAndStoreQRPayload(
                         payload = payload,
                         keyManager = keyManager,
                         libSignalManager = libSignalManager
@@ -462,10 +466,10 @@ fun AndroidKeyExchangeScreen(
                                 signalSessionManager.replenishPreKeysIfNeeded()
 
                                 withContext(Dispatchers.Main) {
-                                    Log.d("KeyExchange", "Signal session built successfully with Kyber PQ ratchet")
+                                    Log.d("KeyDistribution", "Signal session built successfully with Kyber PQ ratchet")
 
-                                    // Store pending exchange and launch contact picker
-                                    pendingKeyExchange = PendingKeyExchange(
+                                    // Store pending distribution and launch contact picker
+                                    pendingKeyDistribution = PendingKeyDistribution(
                                         deviceId = peerId,
                                         publicKeyHex = decodedPayload.publicKeyHex,
                                         shortId = peerShortId
@@ -481,7 +485,7 @@ fun AndroidKeyExchangeScreen(
                                     launchContactPicker()
                                 }
                             } catch (e: Exception) {
-                                Log.e("KeyExchange", "Failed to build Signal session: ${e.message}", e)
+                                Log.e("KeyDistribution", "Failed to build Signal session: ${e.message}", e)
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
                                         localContext,
@@ -509,7 +513,7 @@ fun AndroidKeyExchangeScreen(
         val readyQr = currentQrResult
         if (readyQr == null) {
             // Show loading state while QR is being prepared
-            KeyExchangeScreen(
+            KeyDistributionScreen(
                 deviceId = deviceId,
                 qrCodePayloads = emptyList(),
                 displayUrl = "",
@@ -522,7 +526,7 @@ fun AndroidKeyExchangeScreen(
                 onUntrust = { }
             )
         } else {
-            KeyExchangeScreen(
+            KeyDistributionScreen(
                 deviceId = deviceId,
                 qrCodePayloads = readyQr.payloads,
                 displayUrl = "$TRCKY_ORG_BASE_URL/${readyQr.shortId}",

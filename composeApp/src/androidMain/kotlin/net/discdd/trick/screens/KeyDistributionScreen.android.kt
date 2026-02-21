@@ -41,7 +41,7 @@ actual fun QRCodeView(payload: String) {
     qrBitmap?.let { bitmap ->
         Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "QR Code for key exchange",
+            contentDescription = "QR Code for key distribution",
             modifier = Modifier.fillMaxSize()
         )
     } ?: run {

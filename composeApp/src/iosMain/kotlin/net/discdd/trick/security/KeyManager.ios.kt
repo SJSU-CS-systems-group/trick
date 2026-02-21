@@ -22,7 +22,7 @@ import platform.posix.memcpy
  * Security features:
  * - Private keys stored in iOS Keychain (hardware-backed when available)
  * - Public keys stored in UserDefaults for easy access
- * - Peer keys stored per-device for key exchange tracking
+ * - Peer keys stored per-device for key distribution tracking
  *
  * Note: For production, consider using Security framework's SecKey APIs
  * for more advanced Keychain integration with biometric authentication.
@@ -136,11 +136,4 @@ actual class KeyManager {
     actual fun isPeerTrusted(peerId: String): Boolean {
         return userDefaults.dataForKey("$PEER_KEY_PREFIX$peerId") != null
     }
-}
-
-/**
- * iOS implementation of currentTimeMillis.
- */
-internal actual fun currentTimeMillis(): Long {
-    return net.discdd.trick.data.currentTimeMillis()
 }

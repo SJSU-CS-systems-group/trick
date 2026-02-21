@@ -1,7 +1,7 @@
 package net.discdd.trick.contacts
 
 /**
- * Data class representing a contact that has exchanged keys with the user.
+ * Data class representing a contact that has distributed keys with the user.
  * Combines native Android contact information with Trick-specific data.
  */
 data class TrickContact(

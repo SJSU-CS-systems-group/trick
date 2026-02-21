@@ -50,12 +50,12 @@ expect class KeyManager {
     /**
      * Get a list of all trusted peer IDs.
      *
-     * @return List of peer IDs that have exchanged keys
+     * @return List of peer IDs that have distributed keys
      */
     fun getTrustedPeerIds(): List<String>
 
     /**
-     * Check if a peer is trusted (key exchange completed).
+     * Check if a peer is trusted (key distribution completed).
      *
      * @param peerId The unique identifier for the peer
      * @return True if the peer has a stored public key

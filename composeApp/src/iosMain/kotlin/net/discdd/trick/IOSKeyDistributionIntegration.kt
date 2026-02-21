@@ -17,12 +17,12 @@ import kotlinx.serialization.json.Json
 import net.discdd.trick.contacts.IOSContactPickerScreen
 import net.discdd.trick.contacts.NativeContactsManager
 import net.discdd.trick.libsignal.createLibSignalManager
-import net.discdd.trick.messaging.KeyExchangeBundle
+import net.discdd.trick.messaging.KeyDistributionBundle
 import net.discdd.trick.screens.IOSMultiQRScannerScreen
-import net.discdd.trick.screens.KeyExchangeScreen
-import net.discdd.trick.security.KeyExchangePayload
+import net.discdd.trick.screens.KeyDistributionScreen
+import net.discdd.trick.security.KeyDistributionPayload
 import net.discdd.trick.security.KeyManager
-import net.discdd.trick.security.QRKeyExchange
+import net.discdd.trick.security.QRKeyDistribution
 import net.discdd.trick.security.TRCKY_ORG_BASE_URL
 import net.discdd.trick.signal.PreKeyBundleData
 import net.discdd.trick.signal.SignalSessionManager
@@ -46,15 +46,15 @@ private fun ByteArray.toHexString(): String {
     }
 }
 
-private fun createKeyExchangeBundle(
+private fun createKeyDistributionBundle(
     deviceId: String,
     publicKeyHex: String,
     timestamp: Long,
     signatureHex: String,
     shortId: String,
     bundle: PreKeyBundleData
-): KeyExchangeBundle {
-    return KeyExchangeBundle(
+): KeyDistributionBundle {
+    return KeyDistributionBundle(
         device_id = deviceId.encodeToByteArray().toByteString(),
         public_key = publicKeyHex.hexToBytes().toByteString(),
         timestamp = timestamp,
@@ -87,7 +87,7 @@ private fun encodePayloadForQR(
     shortId: String,
     bundle: PreKeyBundleData
 ): List<String> {
-    val protoBundle = createKeyExchangeBundle(
+    val protoBundle = createKeyDistributionBundle(
         deviceId = deviceId,
         publicKeyHex = publicKeyHex,
         timestamp = timestamp,
@@ -138,12 +138,12 @@ private fun parseQRChunk(data: String): Triple<Int, Int, ByteArray> {
 
 /**
  * Decode reassembled QR payload (raw Protobuf bytes) back to components.
- * Returns Pair of (KeyExchangePayload, PreKeyBundleData).
+ * Returns Pair of (KeyDistributionPayload, PreKeyBundleData).
  */
-private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyExchangePayload, PreKeyBundleData> {
-    val bundle = KeyExchangeBundle.ADAPTER.decode(protoBytes)
+private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyDistributionPayload, PreKeyBundleData> {
+    val bundle = KeyDistributionBundle.ADAPTER.decode(protoBytes)
 
-    val payload = KeyExchangePayload(
+    val payload = KeyDistributionPayload(
         deviceId = bundle.device_id.toByteArray().decodeToString(),
         publicKeyHex = bundle.public_key.toByteArray().toHexString(),
         timestamp = bundle.timestamp,
@@ -179,16 +179,16 @@ private fun decodePayloadFromQR(protoBytes: ByteArray): Pair<KeyExchangePayload,
 }
 
 /**
- * Pending key exchange data waiting for contact selection.
+ * Pending key distribution data waiting for contact selection.
  */
-private data class PendingKeyExchange(
+private data class PendingKeyDistribution(
     val deviceId: String,
     val publicKeyHex: String,
     val shortId: String
 )
 
 @Composable
-fun IOSKeyExchangeScreen(
+fun IOSKeyDistributionScreen(
     deviceId: String,
     onNavigateBack: () -> Unit,
     pairingPresenter: WifiAwarePairingPresenter? = null
@@ -210,8 +210,8 @@ fun IOSKeyExchangeScreen(
     var scannedChunks by remember { mutableStateOf<Map<Int, ByteArray>>(emptyMap()) }
     var expectedTotalParts by remember { mutableStateOf(0) }
 
-    // Contact picker state (pending key exchange waiting for contact selection)
-    var pendingKeyExchange by remember { mutableStateOf<PendingKeyExchange?>(null) }
+    // Contact picker state (pending key distribution waiting for contact selection)
+    var pendingKeyDistribution by remember { mutableStateOf<PendingKeyDistribution?>(null) }
     var showContactPicker by remember { mutableStateOf(false) }
 
     // Success dialog state
@@ -241,14 +241,19 @@ fun IOSKeyExchangeScreen(
                 signalSessionManager.initialize()
                 signalSessionManager.replenishPreKeysIfNeeded()
 
-                val baseResult = QRKeyExchange.generateQRPayload(
+                val baseResult = QRKeyDistribution.generateQRPayload(
                     keyManager = keyManager,
                     libSignalManager = libSignalManager,
                     deviceId = deviceId
                 )
 
                 val signalBundle = signalSessionManager.generatePreKeyBundle()
-                val identityPayload = Json.decodeFromString<KeyExchangePayload>(baseResult.payloadJson)
+
+                // Strip one-time prekeys so the QR code is permanent and deterministic.
+                // Signed prekey + Kyber prekey provide sufficient security.
+                val permanentBundle = signalBundle.copy(preKeyId = null, preKeyPublic = null)
+
+                val identityPayload = Json.decodeFromString<KeyDistributionPayload>(baseResult.payloadJson)
 
                 val payloads = encodePayloadForQR(
                     deviceId = identityPayload.deviceId,
@@ -256,7 +261,7 @@ fun IOSKeyExchangeScreen(
                     timestamp = identityPayload.timestamp,
                     signatureHex = identityPayload.signatureHex,
                     shortId = baseResult.shortId,
-                    bundle = signalBundle
+                    bundle = permanentBundle
                 )
 
                 val orderedPayloads = payloads.sortedBy { payload ->
@@ -271,9 +276,9 @@ fun IOSKeyExchangeScreen(
                 }
             }
         } catch (e: Throwable) {
-            println("Error generating key exchange payload: ${e.message}")
+            println("Error generating key distribution payload: ${e.message}")
             e.printStackTrace()
-            errorMessage = "Failed to generate key exchange: ${e.message}"
+            errorMessage = "Failed to generate key distribution: ${e.message}"
             isLoading = false
         }
     }
@@ -282,7 +287,7 @@ fun IOSKeyExchangeScreen(
     if (showSuccessDialog) {
         AlertDialog(
             onDismissRequest = { showSuccessDialog = false },
-            title = { Text("Key Exchange Complete") },
+            title = { Text("Key Distribution Complete") },
             text = { Text(successMessage) },
             confirmButton = {
                 TextButton(onClick = { showSuccessDialog = false }) {
@@ -355,7 +360,7 @@ fun IOSKeyExchangeScreen(
 
                     // Verify signature and store peer public key
                     val payloadJson = Json.encodeToString(decodedPayload)
-                    val (success, message) = QRKeyExchange.verifyAndStoreQRPayload(
+                    val (success, message) = QRKeyDistribution.verifyAndStoreQRPayload(
                         payload = payloadJson,
                         keyManager = keyManager,
                         libSignalManager = libSignalManager
@@ -388,8 +393,8 @@ fun IOSKeyExchangeScreen(
                         trustedPeers = keyManager.getTrustedPeerIds()
                         showScanner = false
 
-                        // Store pending exchange and launch contact picker
-                        pendingKeyExchange = PendingKeyExchange(
+                        // Store pending distribution and launch contact picker
+                        pendingKeyDistribution = PendingKeyDistribution(
                             deviceId = peerId,
                             publicKeyHex = decodedPayload.publicKeyHex,
                             shortId = peerShortId
@@ -410,7 +415,7 @@ fun IOSKeyExchangeScreen(
     } else if (showContactPicker) {
         IOSContactPickerScreen(
             onContactPicked = { result ->
-                val pending = pendingKeyExchange
+                val pending = pendingKeyDistribution
                 if (pending != null) {
                     // Register the iOS contact mapping before linking
                     nativeContactsManager.registerContactMapping(
@@ -436,13 +441,13 @@ fun IOSKeyExchangeScreen(
                     successMessage = "Secure session established"
                 }
 
-                pendingKeyExchange = null
+                pendingKeyDistribution = null
                 showContactPicker = false
                 showSuccessDialog = true
             },
             onDismiss = {
                 // User cancelled contact selection — session is still valid
-                pendingKeyExchange = null
+                pendingKeyDistribution = null
                 showContactPicker = false
                 successMessage = "Secure session established"
                 showSuccessDialog = true
@@ -453,7 +458,7 @@ fun IOSKeyExchangeScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Key Exchange") },
+                    title = { Text("Key Distribution") },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, "Back")
@@ -483,7 +488,7 @@ fun IOSKeyExchangeScreen(
             }
         }
     } else {
-        KeyExchangeScreen(
+        KeyDistributionScreen(
             deviceId = deviceId,
             qrCodePayloads = qrPayloads,
             displayUrl = if (shortId.isNotBlank()) "$TRCKY_ORG_BASE_URL/$shortId" else "",
