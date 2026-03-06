@@ -6,7 +6,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +17,7 @@ import androidx.compose.ui.unit.dp
  * KeyDistributionScreen provides UI for QR code key distribution.
  *
  * Features:
- * - Display QR codes containing device's public key (may be split across multiple codes)
+ * - Display a single QR code containing the device's hash commitment
  * - Scan QR code from peer device (platform-specific)
  * - List of trusted peers with option to untrust
  */
@@ -37,7 +36,6 @@ fun KeyDistributionScreen(
     onUntrust: (String) -> Unit,
     onWifiAwarePairing: (() -> Unit)? = null
 ) {
-    var currentQrIndex by remember { mutableStateOf(0) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -80,9 +78,8 @@ fun KeyDistributionScreen(
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    // QR Code display with pagination for multiple codes
+                    // QR Code display
                     if (isLoading || qrCodePayloads.isEmpty()) {
-                        // Loading indicator while QR codes are being generated
                         Box(
                             modifier = Modifier
                                 .size(300.dp)
@@ -93,9 +90,7 @@ fun KeyDistributionScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(48.dp)
-                                )
+                                CircularProgressIndicator(modifier = Modifier.size(48.dp))
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     text = "Generating QR code...",
@@ -105,62 +100,18 @@ fun KeyDistributionScreen(
                             }
                         }
                     } else {
-                        // QR code indicator (e.g., "1 of 2")
-                        if (qrCodePayloads.size > 1) {
-                            Text(
-                                text = "QR Code ${currentQrIndex + 1} of ${qrCodePayloads.size}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                        }
-
-                        // QR code with navigation
                         Box(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .size(300.dp)
+                                .padding(8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // QR Code
-                                Box(
-                                    modifier = Modifier
-                                        .size(300.dp)
-                                        .padding(8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    QRCodeView(payload = qrCodePayloads[currentQrIndex])
-                                }
-
-                                // Next button on the right side
-                                if (qrCodePayloads.size > 1) {
-                                    IconButton(
-                                        onClick = {
-                                            currentQrIndex = (currentQrIndex + 1) % qrCodePayloads.size
-                                        },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.ArrowForward,
-                                            contentDescription = "Next QR",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-                                }
-                            }
+                            QRCodeView(payload = qrCodePayloads[0])
                         }
-
                         Text(
-                            text = if (qrCodePayloads.size > 1)
-                                "Peer must scan ALL ${qrCodePayloads.size} QR codes"
-                                else "Show this QR code to your peer",
+                            text = "Show this QR code to your peer",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (qrCodePayloads.size > 1)
-                                MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }

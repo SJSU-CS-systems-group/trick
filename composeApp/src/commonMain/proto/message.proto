@@ -81,3 +81,16 @@ message KeyDistributionBundle {
   bytes kyber_prekey_public = 19;           // Kyber-1024 public key (~1568 bytes)
   bytes kyber_prekey_signature = 20;        // Signature (64 bytes)
 }
+
+// QR code hash commitment payload (replaces full bundle in QR codes)
+// Small JSON payload (~420 chars) that fits in a single QR code.
+// Full prekey bundle is exchanged over TCP after WiFi Aware discovery;
+// this hash commitment authenticates the bundle without carrying it.
+message QRHashPayload {
+  string device_id = 1;
+  string short_id = 2;
+  bytes identity_key = 3;       // Ed25519 public key (32 bytes) — for signature verification
+  bytes combined_key_hash = 4;  // SHA-256(identityKey || signedPreKeyPublic || kyberPreKeyPublic) (32 bytes)
+  bytes signature = 5;          // Ed25519 signature over "$device_id:$combinedHashHex:$timestamp" (64 bytes)
+  int64 timestamp = 6;
+}
