@@ -65,7 +65,7 @@ Development rules and best practices for the Trick Kotlin Multiplatform messagin
 
 #### Dependency Injection
 - **Use Koin** for multiplatform DI
-- Common module in `commonMain/kotlin/net/discdd/trick/di/Koin.kt`
+- Common module in `commonMain/kotlin/org/trcky/trick/di/Koin.kt`
 - Platform-specific modules passed to `initKoin()` from platform entry points
 
 #### Database
@@ -100,7 +100,7 @@ trick/
 
 #### Naming Conventions
 - **Platform-specific files**: Use `.android.kt` and `.ios.kt` suffixes
-- **Package structure**: `net.discdd.trick.<module>`
+- **Package structure**: `org.trcky.trick.<module>`
 - **Expect/Actual Pattern**: Define `expect` in `commonMain`, implement `actual` in platform source sets
 
 ### 6. Security & Best Practices
