@@ -1,4 +1,4 @@
 headers = trick_signal_ffi.h
 headerFilter = trick_signal_ffi.h
-package = net.discdd.trick.libsignal.bridge
+package = org.trcky.trick.libsignal.bridge
 staticLibraries = libtrick_signal_ffi.a

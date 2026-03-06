@@ -359,7 +359,7 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_LDFLAGS = "-lsqlite3";
-				PRODUCT_BUNDLE_IDENTIFIER = "net.discdd.trick.Trick$(TEAM_ID)";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.trcky.trick.Trick$(TEAM_ID)";
 				PRODUCT_NAME = "$(PRODUCT_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;
@@ -388,7 +388,7 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_LDFLAGS = "-lsqlite3";
-				PRODUCT_BUNDLE_IDENTIFIER = "net.discdd.trick.Trick$(TEAM_ID)";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.trcky.trick.Trick$(TEAM_ID)";
 				PRODUCT_NAME = "$(PRODUCT_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;

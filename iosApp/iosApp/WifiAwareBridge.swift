@@ -58,7 +58,7 @@ public class WifiAwareBridge: NSObject, WifiAwareNativeBridge {
     // peerId -> active WiFi Aware connection (stored as Any for type erasure)
     private var connectionMap: [String: Any] = [:]
 
-    private let connectionQueue = DispatchQueue(label: "net.discdd.trick.wifiaware.connections")
+    private let connectionQueue = DispatchQueue(label: "org.trcky.trick.wifiaware.connections")
 
     private var heartbeatTimer: DispatchSourceTimer?
 
