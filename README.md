@@ -22,9 +22,11 @@ Users are identified by their public key rather than a phone number or account, 
 - Persistent encrypted message history via SQLDelight
 - Automatic reconnection with session state recovery after transport interruptions
 
+## Trick's Communication Flow
+<img width="2498" height="927" alt="trick_diagram" src="https://github.com/user-attachments/assets/0410c809-63d9-436b-ba33-cf62af0ccd3e" />
+
 ## Architecture
 <img width="4612" height="2488" alt="trick_system_architecture" src="https://github.com/user-attachments/assets/e86188dd-a2d2-4e71-93f0-708a9795a72e" />
-
 
 The application is built with Kotlin Multiplatform, sharing a single codebase across Android and iOS with platform-specific networking and secure storage. Below the UI and ViewModel layers, a Signal Session Manager coordinates all encryption and decryption by delegating to a shared Rust FFI layer that wraps libsignal. Cryptographic keys and session records are persisted in a SQLDelight database, with private keys encrypted at rest using hardware-backed storage (Android Keystore or iOS Keychain). At the bottom of the stack, Wi-Fi Aware handles peer discovery and data transport.
 
@@ -50,7 +52,7 @@ Wi-Fi Aware connections can drop due to range changes, interference, or device s
 
 ### Platform Support
 
-Android-to-Android and iOS-to-iOS communication work on supported devices. Cross-platform iOS-to-Android communication is currently limited by an ecosystem-level compatibility gap: Apple's iOS 26 implementation requires Wi-Fi Aware Specification Version 4.0 with an OS-level device pairing flow that Android devices do not yet fully support. This reflects a platform maturity gap rather than a protocol limitation, and the Signal Protocol implementation requires no changes once the transport gap is resolved.
+Android-to-Android and iOS-to-iOS communication work on supported devices. Cross-platform iOS-to-Android communication is currently limited by an ecosystem-level compatibility gap.
 
 ## Performance
 
@@ -118,4 +120,4 @@ trick/
 
 ## Dependencies
 
-Trick uses [libsignal](https://github.com/signalapp/libsignal) v0.86.7 for all Signal Protocol operations, [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) for the shared UI, [SQLDelight](https://cashapp.github.io/sqldelight/) for the database, [Ktor](https://ktor.io/) for networking, [Wire](https://square.github.io/wire/) for Protocol Buffer serialization, and [Koin](https://insert-koin.io/) for dependency injection. Full version declarations are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+Trick uses [libsignal](https://github.com/signalapp/libsignal) v0.86.7 for all Signal Protocol operations, [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) for the shared UI, [SQLDelight](https://sqldelight.github.io/sqldelight/latest/) for the database, [Ktor](https://ktor.io/) for networking, [Wire](https://square.github.io/wire/) for Protocol Buffer serialization, and [Koin](https://insert-koin.io/) for dependency injection. Full version declarations are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
