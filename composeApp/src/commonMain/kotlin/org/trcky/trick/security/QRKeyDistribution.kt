@@ -6,25 +6,34 @@ import kotlinx.serialization.json.Json
 import org.trcky.trick.libsignal.LibSignalManager
 import org.trcky.trick.libsignal.PublicKey
 import org.trcky.trick.util.ShortIdGenerator
+import org.trcky.trick.data.currentTimeMillis
+import org.trcky.trick.signal.SignalNativeBridge
+import org.trcky.trick.signal.SignalSessionManager
+import org.trcky.trick.util.sha256
 
 /**
- * Payload structure for QR code key distribution.
- * Contains the device ID, public key, timestamp (fixed at 0 for permanent QR codes),
- * signature, and optional shortId for trcky.org URL.
+ * QR code hash commitment payload.
+ *
+ * Contains a SHA-256 commitment over the full Signal prekey bundle, plus an
+ * Ed25519 signature for authenticity. The full bundle is exchanged over TCP
+ * after WiFi Aware discovery; the QR code merely authenticates it.
+ *
+ * Estimated JSON size: ~420 chars — fits in a single QR code at error-correction L.
  */
 @Serializable
-data class KeyDistributionPayload(
+data class QRHashPayload(
     val deviceId: String,
-    val publicKeyHex: String,
-    val timestamp: Long,
-    val signatureHex: String,
-    val shortId: String? = null
+    val shortId: String,
+    val identityKeyHex: String,   // Ed25519 public key hex (64 chars = 32 bytes)
+    val combinedHashHex: String,  // SHA-256(identityKey || signedPreKeyPublic || kyberPreKeyPublic) hex (64 chars)
+    val signatureHex: String,     // Ed25519 signature hex (128 chars = 64 bytes)
+    val timestamp: Long
 )
 
 /**
- * Result of generating a QR payload, including the JSON and shortId for building the display URL.
+ * Result of generating a QR hash payload.
  */
-data class KeyDistributionQRResult(
+data class QRHashResult(
     val payloadJson: String,
     val shortId: String
 )
@@ -49,105 +58,165 @@ fun parseTrckyShortId(input: String): String? {
 }
 
 /**
- * QRKeyDistribution handles the generation and verification of QR codes for key distribution.
+ * QRKeyDistribution handles generation and verification of single-QR hash commitment payloads.
  *
- * Security features:
- * - QR codes are signed to prevent impersonation
- * - Signature verification ensures authenticity
- * - QR codes are permanent and deterministic (same key material → same QR code)
+ * Protocol:
+ * 1. Device A generates QRHashPayload (SHA-256 commitment + Ed25519 signature) → single QR code.
+ * 2. Device B scans, verifies signature, stores (deviceId → hash) commitment in memory.
+ * 3. After WiFi Aware TCP connection, both sides exchange full prekey bundles.
+ * 4. Each side verifies: SHA-256(received bundle fields) == stored commitment.
+ * 5. On match, buildSessionFromPreKeyBundle() is called to establish the Signal session.
  */
 object QRKeyDistribution {
 
-    /**
-     * Generate a QR code payload containing the device's public key.
-     *
-     * The payload includes:
-     * - Device ID
-     * - Public key (hex encoded)
-     * - Timestamp (fixed at 0 for permanent, deterministic QR codes)
-     * - Signature (to prevent tampering/impersonation)
-     * - ShortId (for trcky.org URL)
-     *
-     * @param keyManager KeyManager to retrieve identity key pair
-     * @param libSignalManager LibSignalManager for signing
-     * @param deviceId The device's unique identifier
-     * @return KeyDistributionQRResult with payloadJson and shortId for display URL
-     */
-    fun generateQRPayload(
-        keyManager: KeyManager,
-        libSignalManager: LibSignalManager,
-        deviceId: String
-    ): KeyDistributionQRResult {
-        val keyPair = keyManager.getIdentityKeyPair()
-            ?: keyManager.generateIdentityKeyPair()
+    // In-memory commitment store: deviceId → 32-byte SHA-256 hash
+    private val pendingHashCommitments = mutableMapOf<String, ByteArray>()
 
-        val timestamp = 0L
-        val publicKeyHex = keyPair.publicKey.data.toHexString()
-        val shortId = ShortIdGenerator.generateShortId(keyPair.publicKey)
+    fun storeCommitment(deviceId: String, hash: ByteArray) {
+        pendingHashCommitments[deviceId] = hash
+    }
 
-        // Sign the payload to prevent tampering (include shortId for new payloads)
-        val dataToSign = "$deviceId:$publicKeyHex:$timestamp:$shortId".encodeToByteArray()
-        val signature = libSignalManager.sign(keyPair.privateKey, dataToSign)
-        val signatureHex = signature.toHexString()
+    fun getCommitment(deviceId: String): ByteArray? = pendingHashCommitments[deviceId]
 
-        val payload = KeyDistributionPayload(
-            deviceId = deviceId,
-            publicKeyHex = publicKeyHex,
-            timestamp = timestamp,
-            signatureHex = signatureHex,
-            shortId = shortId
-        )
-
-        val payloadJson = Json.encodeToString(payload)
-        return KeyDistributionQRResult(payloadJson = payloadJson, shortId = shortId)
+    fun clearCommitment(deviceId: String) {
+        pendingHashCommitments.remove(deviceId)
     }
 
     /**
-     * Verify and store a QR code payload from a peer.
+     * Generate a QR hash commitment payload for this device.
+     *
+     * Computes SHA-256(identityKey || signedPreKeyPublic || kyberPreKeyPublic),
+     * signs "$deviceId:$hashHex:$timestamp" with the identity private key,
+     * and returns the JSON-encoded QRHashPayload.
+     */
+    suspend fun generateQRHashPayload(
+        signalSessionManager: SignalSessionManager,
+        deviceId: String
+    ): QRHashResult {
+        val bundle = signalSessionManager.generatePreKeyBundle()
+        val kyberPublic = bundle.kyberPreKeyPublic
+            ?: throw IllegalStateException("Kyber prekey is required")
+
+        // SHA-256(identityKey || signedPreKeyPublic || kyberPreKeyPublic)
+        val combinedBytes = bundle.identityKey + bundle.signedPreKeyPublic + kyberPublic
+        val combinedHash = sha256(combinedBytes)
+        val combinedHashHex = combinedHash.toHexString()
+        val identityKeyHex = bundle.identityKey.toHexString()
+        val shortId = signalSessionManager.getShortId()
+        val timestamp = currentTimeMillis()
+
+        // Sign "$deviceId:$combinedHashHex:$timestamp"
+        val dataToSign = "$deviceId:$combinedHashHex:$timestamp".encodeToByteArray()
+        val signature = signalSessionManager.signWithIdentityKey(dataToSign)
+        val signatureHex = signature.toHexString()
+
+        val payload = QRHashPayload(
+            deviceId = deviceId,
+            shortId = shortId,
+            identityKeyHex = identityKeyHex,
+            combinedHashHex = combinedHashHex,
+            signatureHex = signatureHex,
+            timestamp = timestamp
+        )
+        return QRHashResult(payloadJson = Json.encodeToString(payload), shortId = shortId)
+    }
+
+    /**
+     * Verify a scanned QR hash payload and store the hash commitment on success.
      *
      * Verification steps:
-     * 1. Parse JSON payload
-     * 2. Verify signature using the peer's public key
-     * 3. Store the peer's public key if verification passes
+     * 1. Decode JSON.
+     * 2. Verify Ed25519 signature with the included identity public key.
+     * 3. Store (deviceId → combinedHash) in memory for later TCP bundle verification.
      *
-     * @param payload JSON string from QR code
-     * @param keyManager KeyManager to store peer's public key
-     * @param libSignalManager LibSignalManager for signature verification
-     * @return True if verification and storage succeeded, false otherwise
+     * @return Pair(success, deviceId or error message).
      */
-    fun verifyAndStoreQRPayload(
-        payload: String,
-        keyManager: KeyManager,
-        libSignalManager: LibSignalManager
-    ): Pair<Boolean, String> {
+    fun verifyAndStoreQRHashPayload(payload: String): Pair<Boolean, String> {
         return try {
-            val data = Json.decodeFromString<KeyDistributionPayload>(payload)
+            val data = Json.decodeFromString<QRHashPayload>(payload)
 
-            // Decode hex strings
-            val publicKeyBytes = data.publicKeyHex.hexToByteArray()
+            val identityKeyBytes = data.identityKeyHex.hexToByteArray()
+            val combinedHashBytes = data.combinedHashHex.hexToByteArray()
             val signatureBytes = data.signatureHex.hexToByteArray()
 
-            // Verify signature (match format used when signing: with or without shortId)
-            val dataToVerify = if (data.shortId != null) {
-                "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}:${data.shortId}".encodeToByteArray()
-            } else {
-                "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}".encodeToByteArray()
-            }
-            val publicKey = PublicKey(publicKeyBytes)
-
-            if (!libSignalManager.verify(publicKey, dataToVerify, signatureBytes)) {
-                return Pair(false, "Invalid signature - QR code may be tampered")
+            // Verify signature: "$deviceId:$combinedHashHex:$timestamp"
+            val dataToVerify = "${data.deviceId}:${data.combinedHashHex}:${data.timestamp}".encodeToByteArray()
+            if (!SignalNativeBridge.publicKeyVerify(identityKeyBytes, dataToVerify, signatureBytes)) {
+                return Pair(false, "Invalid signature — QR code may be tampered")
             }
 
-            // Store peer's public key
-            keyManager.storePeerPublicKey(data.deviceId, publicKey)
-
-            Pair(true, "Successfully distributed keys with ${data.deviceId}")
+            storeCommitment(data.deviceId, combinedHashBytes)
+            Pair(true, data.deviceId)
         } catch (e: Exception) {
             Pair(false, "Failed to parse QR code: ${e.message}")
         }
     }
+}
 
+// ============================================================
+// LEGACY API — used by iOS key distribution (IOSKeyDistributionIntegration.kt)
+// Android has switched to the single-QR hash commitment protocol above.
+// ============================================================
+
+@Serializable
+data class KeyDistributionPayload(
+    val deviceId: String,
+    val publicKeyHex: String,
+    val timestamp: Long,
+    val signatureHex: String,
+    val shortId: String? = null
+)
+
+data class KeyDistributionQRResult(
+    val payloadJson: String,
+    val shortId: String
+)
+
+fun QRKeyDistribution.generateQRPayload(
+    keyManager: KeyManager,
+    libSignalManager: LibSignalManager,
+    deviceId: String
+): KeyDistributionQRResult {
+    val keyPair = keyManager.getIdentityKeyPair() ?: keyManager.generateIdentityKeyPair()
+    val timestamp = 0L
+    val publicKeyHex = keyPair.publicKey.data.toHexString()
+    val shortId = ShortIdGenerator.generateShortId(keyPair.publicKey)
+    val dataToSign = "$deviceId:$publicKeyHex:$timestamp:$shortId".encodeToByteArray()
+    val signature = libSignalManager.sign(keyPair.privateKey, dataToSign)
+    val signatureHex = signature.toHexString()
+    val payload = KeyDistributionPayload(
+        deviceId = deviceId,
+        publicKeyHex = publicKeyHex,
+        timestamp = timestamp,
+        signatureHex = signatureHex,
+        shortId = shortId
+    )
+    return KeyDistributionQRResult(payloadJson = Json.encodeToString(payload), shortId = shortId)
+}
+
+fun QRKeyDistribution.verifyAndStoreQRPayload(
+    payload: String,
+    keyManager: KeyManager,
+    libSignalManager: LibSignalManager
+): Pair<Boolean, String> {
+    return try {
+        val data = Json.decodeFromString<KeyDistributionPayload>(payload)
+        val publicKeyBytes = data.publicKeyHex.hexToByteArray()
+        val signatureBytes = data.signatureHex.hexToByteArray()
+        val dataToVerify = if (data.shortId != null) {
+            "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}:${data.shortId}".encodeToByteArray()
+        } else {
+            "${data.deviceId}:${data.publicKeyHex}:${data.timestamp}".encodeToByteArray()
+        }
+        val publicKey = PublicKey(publicKeyBytes)
+        if (!libSignalManager.verify(publicKey, dataToVerify, signatureBytes)) {
+            return Pair(false, "Invalid signature - QR code may be tampered")
+        }
+        keyManager.storePeerPublicKey(data.deviceId, publicKey)
+        Pair(true, "Successfully distributed keys with ${data.deviceId}")
+    } catch (e: Exception) {
+        Pair(false, "Failed to parse QR code: ${e.message}")
+    }
 }
 
 /**
@@ -169,42 +238,4 @@ fun String.hexToByteArray(): ByteArray {
     return chunked(2)
         .map { it.toInt(16).toByte() }
         .toByteArray()
-}
-
-// ============================================================
-// SIGNAL PROTOCOL KEY DISTRIBUTION (New)
-// ============================================================
-
-/**
- * Result of Signal-based QR generation.
- */
-data class SignalKeyDistributionQRResult(
-    val payloadJson: String,
-    val shortId: String,
-    val bundleUploaded: Boolean
-)
-
-/**
- * Result of processing a scanned QR code for Signal protocol.
- */
-sealed class SignalScanResult {
-    data class Success(
-        val shortId: String,
-        val identityKey: ByteArray
-    ) : SignalScanResult()
-
-    data class BundleFetchFailed(
-        val shortId: String,
-        val message: String
-    ) : SignalScanResult()
-
-    data class SessionBuildFailed(
-        val shortId: String,
-        val message: String
-    ) : SignalScanResult()
-
-    data class IdentityChanged(
-        val shortId: String,
-        val newIdentityKey: ByteArray
-    ) : SignalScanResult()
 }

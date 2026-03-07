@@ -608,6 +608,11 @@ class SignalSessionManager(
         return identityPublicKey
     }
 
+    fun signWithIdentityKey(data: ByteArray): ByteArray {
+        checkInitialized()
+        return SignalNativeBridge.privateKeySign(identityPrivateKey, data)
+    }
+
     suspend fun deleteSession(peerId: String, deviceId: Int = 1): Unit = withContext(Dispatchers.Default) {
         mutex.withLock {
             checkInitialized()

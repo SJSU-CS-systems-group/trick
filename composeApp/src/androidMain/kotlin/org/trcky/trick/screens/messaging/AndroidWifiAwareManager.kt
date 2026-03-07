@@ -24,6 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import kotlin.coroutines.cancellation.CancellationException
 import org.trcky.trick.metrics.PerformanceTracker
+import org.trcky.trick.security.QRKeyDistribution
+import org.trcky.trick.signal.PreKeyBundleSerialization
+import org.trcky.trick.util.sha256
 import okio.ByteString.Companion.toByteString
 
 /**
@@ -436,6 +439,17 @@ class AndroidWifiAwareManager(
             val inputStream = DataInputStream(clientSocket.getInputStream())
             val outputStream = DataOutputStream(clientSocket.getOutputStream())
 
+            // Bundle exchange: verify hash commitment before starting message loop
+            if (!exchangeAndVerifyBundle(remoteDeviceId, inputStream, outputStream)) {
+                clientSocket.close()
+                serverSocket.close()
+                connectivityManager.unregisterNetworkCallback(networkCallback)
+                notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
+                notifyMessage("[Error] Pairing verification failed — possible MITM attack!", remoteDeviceId)
+                pendingHandshakes.remove(peerHandle)
+                return
+            }
+
             val connection =
                     PeerConnection(
                             peerId = remoteDeviceId,
@@ -606,6 +620,16 @@ class AndroidWifiAwareManager(
 
             val inputStream = DataInputStream(socket.getInputStream())
             val outputStream = DataOutputStream(socket.getOutputStream())
+
+            // Bundle exchange: verify hash commitment before starting message loop
+            if (!exchangeAndVerifyBundle(remoteDeviceId, inputStream, outputStream)) {
+                socket.close()
+                connectivityManager.unregisterNetworkCallback(networkCallback)
+                notifyConnectionStatus(remoteDeviceId, ConnectionState.DISCONNECTED)
+                notifyMessage("[Error] Pairing verification failed — possible MITM attack!", remoteDeviceId)
+                pendingHandshakes.remove(peerHandle)
+                return
+            }
 
             val connection =
                     PeerConnection(
@@ -796,6 +820,67 @@ class AndroidWifiAwareManager(
             } finally {
                 handleConnectionLost(peerId)
             }
+        }
+    }
+
+    /**
+     * TCP bundle exchange: send own prekey bundle and verify peer's bundle against the stored
+     * QR hash commitment. Called immediately after TCP socket is established, before the message loop.
+     *
+     * If no commitment is stored for [peerId] (e.g. reconnection after prior pairing), the exchange
+     * is skipped and the function returns true, allowing the existing Signal session to handle things.
+     *
+     * Returns true if the connection should proceed, false if it must be dropped.
+     */
+    private suspend fun exchangeAndVerifyBundle(
+        peerId: String,
+        inputStream: DataInputStream,
+        outputStream: DataOutputStream
+    ): Boolean {
+        val storedCommitment = QRKeyDistribution.getCommitment(peerId)
+            ?: return true  // No pending commitment — reconnection or already-paired device, allow through
+
+        return try {
+            // Send our bundle
+            val localBundle = signalSessionManager.generatePreKeyBundle()
+            val localBundleJson = PreKeyBundleSerialization.serialize(localBundle, System.currentTimeMillis())
+            val localBundleBytes = localBundleJson.encodeToByteArray()
+            outputStream.writeInt(localBundleBytes.size)
+            outputStream.write(localBundleBytes)
+            outputStream.flush()
+
+            // Read peer's bundle
+            val peerBundleLength = inputStream.readInt()
+            if (peerBundleLength <= 0 || peerBundleLength > 100_000) {
+                Log.e(TAG, "Invalid bundle length from $peerId: $peerBundleLength")
+                return false
+            }
+            val peerBundleBytes = ByteArray(peerBundleLength)
+            inputStream.readFully(peerBundleBytes)
+
+            val peerBundle = PreKeyBundleSerialization.deserialize(String(peerBundleBytes, Charsets.UTF_8))
+
+            // Verify SHA-256(identityKey || signedPreKeyPublic || kyberPreKeyPublic) == stored commitment
+            val kyberPublic = peerBundle.kyberPreKeyPublic ?: run {
+                Log.e(TAG, "Peer bundle missing Kyber prekey for ${peerId.take(8)}")
+                return false
+            }
+            val combinedBytes = peerBundle.identityKey + peerBundle.signedPreKeyPublic + kyberPublic
+            val computedHash = sha256(combinedBytes)
+
+            if (!computedHash.contentEquals(storedCommitment)) {
+                Log.e(TAG, "Bundle hash MISMATCH for ${peerId.take(8)} — possible MITM attack!")
+                return false
+            }
+
+            // Build Signal session from verified bundle
+            signalSessionManager.buildSessionFromPreKeyBundle(peerId, 1, peerBundle)
+            QRKeyDistribution.clearCommitment(peerId)
+            Log.d(TAG, "Bundle verified and Signal session built with ${DeviceIdentity.getShortId(peerId)}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Bundle exchange failed for ${peerId.take(8)}: ${e.message}", e)
+            false
         }
     }
 
