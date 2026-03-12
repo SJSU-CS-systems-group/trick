@@ -1,0 +1,52 @@
+package org.trick
+
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.navigation.compose.rememberNavController
+import org.trick.navigation.KeyDistributionContent
+import org.trick.navigation.OnPickImageRequest
+import org.trick.navigation.TrickNavHost
+import org.trick.screens.UnsupportedDeviceScreen
+import org.trick.screens.messaging.WifiAwareService
+import org.trick.theme.AppThemeState
+import org.trick.theme.LocalAppTheme
+import org.trick.theme.TrickTheme
+
+@Composable
+fun App(
+    wifiAwareService: WifiAwareService,
+    permissionsGranted: Boolean = false,
+    wifiAwareSupported: Boolean = true,
+    onPickImage: OnPickImageRequest? = null,
+    keyDistributionContent: KeyDistributionContent? = null
+) {
+    var isDarkTheme by remember { mutableStateOf(true) }
+    CompositionLocalProvider(
+        LocalAppTheme provides AppThemeState(
+            isDark = isDarkTheme,
+            onToggleTheme = { isDarkTheme = !isDarkTheme }
+        )
+    ) {
+        TrickTheme(isDark = isDarkTheme) {
+            Surface {
+            if (!wifiAwareSupported) {
+                UnsupportedDeviceScreen()
+                return@Surface
+            }
+            val navController = rememberNavController()
+            TrickNavHost(
+                navController = navController,
+                wifiAwareService = wifiAwareService,
+                permissionsGranted = permissionsGranted,
+                onPickImage = onPickImage,
+                keyDistributionContent = keyDistributionContent
+            )
+        }
+        }
+    }
+}

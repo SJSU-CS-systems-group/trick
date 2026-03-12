@@ -3,7 +3,7 @@
 //! Each function converts JNI types to Rust types, calls the internal ops
 //! functions, and converts results back to JNI types.
 //!
-//! Naming convention: Java_org_trcky_trick_signal_SignalNativeBridge_<method>
+//! Naming convention: Java_org_trick_signal_SignalNativeBridge_<method>
 
 #![cfg(target_os = "android")]
 
@@ -48,7 +48,7 @@ fn get_string(env: &mut JNIEnv, s: &JString) -> Result<String, jint> {
 // =============================================================================
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGenerateIdentityKeyPair(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGenerateIdentityKeyPair(
     _env: JNIEnv,
     _class: JClass,
     out_public: JByteArray,
@@ -69,7 +69,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGene
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGenerateRegistrationId(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGenerateRegistrationId(
     _env: JNIEnv,
     _class: JClass,
 ) -> jint {
@@ -77,7 +77,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGene
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGeneratePreKeyRecord(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGeneratePreKeyRecord(
     _env: JNIEnv,
     _class: JClass,
     pre_key_id: jint,
@@ -93,7 +93,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGene
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGenerateSignedPreKeyRecord(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGenerateSignedPreKeyRecord(
     _env: JNIEnv,
     _class: JClass,
     signed_pre_key_id: jint,
@@ -118,7 +118,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGene
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGenerateKyberPreKeyRecord(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGenerateKyberPreKeyRecord(
     _env: JNIEnv,
     _class: JClass,
     kyber_pre_key_id: jint,
@@ -150,7 +150,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGene
 /// identity change type in out_identity_changed (int array of length 1).
 /// Return value: bytes written to out_session, or negative on error.
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeProcessPreKeyBundle(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeProcessPreKeyBundle(
     mut _env: JNIEnv,
     _class: JClass,
     identity_public: JByteArray,
@@ -243,7 +243,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeProc
 /// message type and updated session in out_message_type_and_session_len (int[2]).
 /// Return value: bytes written to out_ciphertext, or negative on error.
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeEncryptMessage(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeEncryptMessage(
     mut _env: JNIEnv,
     _class: JClass,
     identity_public: JByteArray,
@@ -290,7 +290,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeEncr
 // =============================================================================
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGetCiphertextMessageType(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeGetCiphertextMessageType(
     _env: JNIEnv,
     _class: JClass,
     ciphertext: JByteArray,
@@ -303,7 +303,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeGetC
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePreKeyMessageGetIds(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativePreKeyMessageGetIds(
     _env: JNIEnv,
     _class: JClass,
     ciphertext: JByteArray,
@@ -325,7 +325,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePreK
 /// out_meta: [consumed_pre_key_id, consumed_kyber_pre_key_id, session_len, sender_identity_len]
 /// Return value: bytes of plaintext written, or negative on error.
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeDecryptMessage(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeDecryptMessage(
     mut _env: JNIEnv,
     _class: JClass,
     identity_public: JByteArray,
@@ -389,7 +389,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeDecr
 // =============================================================================
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePreKeyRecordGetPublicKey(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativePreKeyRecordGetPublicKey(
     _env: JNIEnv,
     _class: JClass,
     record: JByteArray,
@@ -405,7 +405,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePreK
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeSignedPreKeyRecordGetPublicKey(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeSignedPreKeyRecordGetPublicKey(
     _env: JNIEnv,
     _class: JClass,
     record: JByteArray,
@@ -424,7 +424,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeSign
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeKyberPreKeyRecordGetPublicKey(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativeKyberPreKeyRecordGetPublicKey(
     _env: JNIEnv,
     _class: JClass,
     record: JByteArray,
@@ -450,7 +450,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativeKybe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePrivateKeySign(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativePrivateKeySign(
     _env: JNIEnv,
     _class: JClass,
     private_key: JByteArray,
@@ -468,7 +468,7 @@ pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePriv
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_trcky_trick_signal_SignalNativeBridge_nativePublicKeyVerify(
+pub extern "system" fn Java_org_trick_signal_SignalNativeBridge_nativePublicKeyVerify(
     _env: JNIEnv,
     _class: JClass,
     public_key: JByteArray,

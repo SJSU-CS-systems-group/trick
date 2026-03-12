@@ -37,8 +37,8 @@
             android:name=".metrics.StressTestReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="org.trcky.trick.STRESS_TEST" />
-                <action android:name="org.trcky.trick.STRESS_TEST_CANCEL" />
+                <action android:name="org.trick.STRESS_TEST" />
+                <action android:name="org.trick.STRESS_TEST_CANCEL" />
             </intent-filter>
         </receiver>
     </application>

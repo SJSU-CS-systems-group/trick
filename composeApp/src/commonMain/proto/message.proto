@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package org.trcky.trick.messaging;
+package org.trick.messaging;
 
-option java_package = "org.trcky.trick.messaging";
+option java_package = "org.trick.messaging";
 
 // Message type enumeration
 enum MessageType {

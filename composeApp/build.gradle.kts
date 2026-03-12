@@ -46,7 +46,7 @@ kotlin {
             cinterops {
                 val libsignal by creating {
                     defFile(project.file("src/nativeInterop/cinterop/libsignal.def"))
-                    packageName("org.trcky.trick.libsignal.bridge")
+                    packageName("org.trick.libsignal.bridge")
                     compilerOpts("-I${project.rootDir}/rust/trick-signal-ffi")
                     extraOpts("-libraryPath", "$rustTargetDir/$rustTriple/release")
                 }
@@ -143,11 +143,11 @@ kotlin {
 }
 
 android {
-    namespace = "org.trcky.trick"
+    namespace = "org.trick"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "org.trcky.trick"
+        applicationId = "org.trick"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
@@ -214,7 +214,7 @@ tasks.register<Exec>("buildRustAndroid") {
 sqldelight {
     databases {
         create("TrickDatabase") {
-            packageName.set("org.trcky.trick")
+            packageName.set("org.trick")
             verifyMigrations.set(true)
         }
     }
