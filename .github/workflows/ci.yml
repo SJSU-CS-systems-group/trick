@@ -1,15 +1,16 @@
 name: CI
-
 on: [push]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   android-common-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -22,15 +23,16 @@ jobs:
           api-level: 36
           build-tools: 36.0.0
 
+      - name: Cache Konan
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*', '**/*.kts', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
+
       - uses: gradle/gradle-build-action@v3
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Unit tests (runs common on JVM)
-        run: ./gradlew :composeApp:testDebugUnitTest
-
-      - name: Assemble debug (optional)
-        run: ./gradlew :composeApp:assembleDebug
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      - name: Unit tests + Assemble
+        run: ./gradlew :composeApp:testDebugUnitTest :composeApp:assembleDebug --build-cache
