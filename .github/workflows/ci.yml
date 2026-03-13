@@ -39,4 +39,4 @@ jobs:
       - uses: gradle/gradle-build-action@v3
 
       - name: Unit tests + Assemble
-        run: ./gradlew :composeApp:testDebugUnitTest :composeApp:assembleDebug --build-cache --configuration-cache
+        run: ./gradlew :composeApp:testDebugUnitTest :composeApp:assembleDebug --build-cache
