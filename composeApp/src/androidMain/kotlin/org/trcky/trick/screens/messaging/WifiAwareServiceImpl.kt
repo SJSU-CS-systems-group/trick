@@ -7,10 +7,11 @@ import org.trcky.trick.signal.SignalSessionManager
 
 class WifiAwareServiceImpl(
     private val context: Context,
-    private val signalSessionManager: SignalSessionManager
+    private val signalSessionManager: SignalSessionManager,
+    private val trickDDDManager: TrickDDDManager? = null
 ) : WifiAwareService {
     // Connection-based WiFi Aware manager
-    private val manager = AndroidWifiAwareManager(context, signalSessionManager)
+    private val manager = AndroidWifiAwareManager(context, signalSessionManager, trickDDDManager)
 
     init {
         // Register manager for stress-test access via ADB broadcast
@@ -34,6 +35,10 @@ class WifiAwareServiceImpl(
                 Log.d("WifiAwareServiceImpl", "Connection status: ${peerId.take(8)} -> $state")
             }
         )
+
+        trickDDDManager?.startListening { chatMessage, _ ->
+            onMessageReceived(chatMessage, null)
+        }
     }
 
     override fun sendMessage(message: String) {

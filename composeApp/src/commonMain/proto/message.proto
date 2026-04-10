@@ -49,6 +49,13 @@ message ChatMessage {
   optional int32 sender_device_id = 11;      // Sender's device ID (default 1)
 }
 
+// Routing envelope for DDD bundle network fallback.
+// Wraps an encrypted ChatMessage with the destination DDD client ID.
+message TrickADU {
+  string destination_client_id = 1;
+  bytes  chat_message           = 2;
+}
+
 // Key distribution payload for QR code - compact binary format with full Signal bundle
 // This format uses protobuf + Base32 encoding for QR alphanumeric mode compatibility
 // Max size ~1960 bytes raw → ~3136 chars Base32 → fits in QR Version 35-40 (alphanumeric)
@@ -80,6 +87,8 @@ message KeyDistributionBundle {
   int32 kyber_prekey_id = 18;
   bytes kyber_prekey_public = 19;           // Kyber-1024 public key (~1568 bytes)
   bytes kyber_prekey_signature = 20;        // Signature (64 bytes)
+
+  optional string ddd_client_id = 21;       // DDD routing address (BundleClient client ID)
 }
 
 // QR code hash commitment payload (replaces full bundle in QR codes)

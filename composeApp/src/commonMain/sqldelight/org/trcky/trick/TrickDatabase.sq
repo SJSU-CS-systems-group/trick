@@ -4,7 +4,8 @@
 CREATE TABLE MessageMetadata (
     short_id TEXT NOT NULL PRIMARY KEY,
     last_message_at INTEGER,
-    last_message_preview TEXT
+    last_message_preview TEXT,
+    ddd_client_id TEXT
 );
 
 CREATE INDEX MessageMetadata_last_message_at ON MessageMetadata(last_message_at);
@@ -49,6 +50,12 @@ WHERE short_id = ?;
 deleteMetadata:
 DELETE FROM MessageMetadata
 WHERE short_id = ?;
+
+upsertDddClientId:
+UPDATE MessageMetadata SET ddd_client_id = ? WHERE short_id = ?;
+
+getDddClientId:
+SELECT ddd_client_id FROM MessageMetadata WHERE short_id = ?;
 
 -- Message queries
 selectMessagesByShortId:

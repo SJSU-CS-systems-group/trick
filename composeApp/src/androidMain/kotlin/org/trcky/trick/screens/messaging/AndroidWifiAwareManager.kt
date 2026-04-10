@@ -40,7 +40,8 @@ import okio.ByteString.Companion.toByteString
  */
 class AndroidWifiAwareManager(
     private val context: Context,
-    private val signalSessionManager: SignalSessionManager
+    private val signalSessionManager: SignalSessionManager,
+    private val trickDDDManager: TrickDDDManager? = null
 ) {
     private val TAG = "WifiAware"
 
@@ -49,6 +50,9 @@ class AndroidWifiAwareManager(
         private const val CONTENT_TYPE_PHOTO = 1
         private const val HEARTBEAT_FRAME_LENGTH = 0
     }
+
+    private val peerDddClientIds = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val db by lazy { org.trcky.trick.data.DatabaseProvider.getDatabase() }
 
     // WiFi Aware components
     private var wifiAwareManager: WifiAwareManager? = null
@@ -843,7 +847,11 @@ class AndroidWifiAwareManager(
         return try {
             // Send our bundle
             val localBundle = signalSessionManager.generatePreKeyBundle()
-            val localBundleJson = PreKeyBundleSerialization.serialize(localBundle, System.currentTimeMillis())
+            val localBundleJson = PreKeyBundleSerialization.serialize(
+                localBundle,
+                System.currentTimeMillis(),
+                dddClientId = trickDDDManager?.getLocalDddClientId()
+            )
             val localBundleBytes = localBundleJson.encodeToByteArray()
             outputStream.writeInt(localBundleBytes.size)
             outputStream.write(localBundleBytes)
@@ -877,6 +885,16 @@ class AndroidWifiAwareManager(
             signalSessionManager.buildSessionFromPreKeyBundle(peerId, 1, peerBundle)
             QRKeyDistribution.clearCommitment(peerId)
             Log.d(TAG, "Bundle verified and Signal session built with ${DeviceIdentity.getShortId(peerId)}")
+
+            // Cache and persist peer's DDD routing address
+            peerBundle.dddClientId?.let { dddClientId ->
+                peerDddClientIds[peerId] = dddClientId
+                try {
+                    db.trickDatabaseQueries.upsertDddClientId(dddClientId, peerId)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to persist DDD client ID for ${peerId.take(8)}: ${e.message}")
+                }
+            }
             true
         } catch (e: Exception) {
             Log.e(TAG, "Bundle exchange failed for ${peerId.take(8)}: ${e.message}", e)
@@ -953,13 +971,14 @@ class AndroidWifiAwareManager(
     private fun sendEncryptedContent(contentBytes: ByteArray, peerId: String, contentType: String = "unknown") {
         scope.launch(Dispatchers.IO) {
             val connection = connectionPool.getConnection(peerId)
+            val dddClientId = if (connection == null) peerDddClientIds[peerId] else null
 
-            if (connection == null) {
-                Log.e(TAG, "Cannot send: no connection to ${DeviceIdentity.getShortId(peerId)}")
+            if (connection == null && dddClientId == null) {
+                Log.e(TAG, "Cannot send: no connection or DDD address for ${DeviceIdentity.getShortId(peerId)}")
                 withContext(Dispatchers.Main) {
                     notifyMessage(
-                            "[Error] Not connected to ${DeviceIdentity.getShortId(peerId)}",
-                            null
+                        "Peer unreachable — no DDD address known for ${DeviceIdentity.getShortId(peerId)}",
+                        null
                     )
                 }
                 return@launch
@@ -971,9 +990,6 @@ class AndroidWifiAwareManager(
             val plaintextSize = contentBytes.size
 
             try {
-                val outputStream =
-                        connection.outputStream ?: throw Exception("OutputStream is null")
-
                 if (!signalSessionManager.hasSession(peerId)) {
                     Log.e(TAG, "No Signal session for $peerId")
                     withContext(Dispatchers.Main) {
@@ -1003,6 +1019,14 @@ class AndroidWifiAwareManager(
                     encrypted_content = result.ciphertext.toByteString(),
                     encryption_version = "signal-v1"
                 )
+
+                // ── DDD fallback: send via bundle network if no direct connection ──
+                if (connection == null && dddClientId != null) {
+                    trickDDDManager?.sendViaDDD(dddClientId, chatMessage)
+                    return@launch
+                }
+
+                val outputStream = connection!!.outputStream ?: throw Exception("OutputStream is null")
 
                 // ── Metrics: serialize ───────────────────────────────────
                 val messageBytes = PerformanceTracker.measure("transport", "serialize_time",

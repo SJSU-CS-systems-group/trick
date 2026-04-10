@@ -14,10 +14,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import org.trcky.trick.metrics.StressTestReceiver
-import org.trcky.trick.screens.messaging.WifiAwareServiceImpl
+import org.trcky.trick.screens.messaging.WifiAwareService
 import org.trcky.trick.signal.SignalSessionManager
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -87,8 +86,8 @@ class MainActivity : ComponentActivity(), KoinComponent {
                 signalSessionManager.replenishPreKeysIfNeeded()
             }
 
-            // Create WifiAwareService with SignalSessionManager
-            val wifiAwareService = remember { WifiAwareServiceImpl(this@MainActivity, signalSessionManager) }
+            // Get WifiAwareService from Koin (includes DDD fallback support)
+            val wifiAwareService: WifiAwareService = get()
 
             AndroidApp(
                 wifiAwareService = wifiAwareService,

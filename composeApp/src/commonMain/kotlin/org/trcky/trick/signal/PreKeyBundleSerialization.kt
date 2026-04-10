@@ -30,7 +30,8 @@ data class PreKeyBundleJson(
     val kyberPreKeyId: Int? = null,
     val kyberPreKeyPublic: String? = null,
     val kyberPreKeySignature: String? = null,
-    val timestamp: Long
+    val timestamp: Long,
+    val dddClientId: String? = null
 )
 
 /**
@@ -46,7 +47,7 @@ object PreKeyBundleSerialization {
     /**
      * Serialize PreKeyBundleData to JSON string for API upload.
      */
-    fun serialize(bundle: PreKeyBundleData, timestamp: Long): String {
+    fun serialize(bundle: PreKeyBundleData, timestamp: Long, dddClientId: String? = null): String {
         val jsonBundle = PreKeyBundleJson(
             version = 2,
             registrationId = bundle.registrationId,
@@ -60,7 +61,8 @@ object PreKeyBundleSerialization {
             kyberPreKeyId = bundle.kyberPreKeyId,
             kyberPreKeyPublic = bundle.kyberPreKeyPublic?.let { Base64.encode(it) },
             kyberPreKeySignature = bundle.kyberPreKeySignature?.let { Base64.encode(it) },
-            timestamp = timestamp
+            timestamp = timestamp,
+            dddClientId = dddClientId
         )
         return json.encodeToString(jsonBundle)
     }
@@ -99,7 +101,8 @@ object PreKeyBundleSerialization {
             identityKey = Base64.decode(parsed.identityKey),
             kyberPreKeyId = parsed.kyberPreKeyId,
             kyberPreKeyPublic = parsed.kyberPreKeyPublic?.let { Base64.decode(it) },
-            kyberPreKeySignature = parsed.kyberPreKeySignature?.let { Base64.decode(it) }
+            kyberPreKeySignature = parsed.kyberPreKeySignature?.let { Base64.decode(it) },
+            dddClientId = parsed.dddClientId
         )
     }
 }

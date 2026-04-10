@@ -1,0 +1,77 @@
+CREATE TABLE MessageMetadata (
+    short_id TEXT NOT NULL PRIMARY KEY,
+    last_message_at INTEGER,
+    last_message_preview TEXT,
+    ddd_client_id TEXT
+);
+
+CREATE INDEX MessageMetadata_last_message_at ON MessageMetadata(last_message_at);
+
+CREATE TABLE Message (
+    id TEXT NOT NULL PRIMARY KEY,
+    short_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL,
+    is_sent INTEGER NOT NULL,
+    is_encrypted INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    image_path TEXT,
+    status TEXT NOT NULL,
+    FOREIGN KEY(short_id) REFERENCES MessageMetadata(short_id) ON DELETE CASCADE
+);
+
+CREATE INDEX Message_short_id ON Message(short_id);
+CREATE INDEX Message_timestamp ON Message(timestamp);
+CREATE INDEX Message_short_id_timestamp ON Message(short_id, timestamp);
+
+CREATE TABLE SignalIdentity (
+    id INTEGER NOT NULL PRIMARY KEY DEFAULT 1,
+    registration_id INTEGER NOT NULL,
+    identity_key_public BLOB NOT NULL,
+    identity_key_private_encrypted BLOB NOT NULL,
+    identity_key_private_iv BLOB NOT NULL,
+    short_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    CHECK (id = 1)
+);
+
+CREATE TABLE SignalIdentityKey (
+    address_name TEXT NOT NULL,
+    device_id INTEGER NOT NULL,
+    identity_key BLOB NOT NULL,
+    trust_level INTEGER NOT NULL DEFAULT 1,
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    PRIMARY KEY (address_name, device_id)
+);
+
+CREATE INDEX SignalIdentityKey_address ON SignalIdentityKey(address_name);
+
+CREATE TABLE SignalSession (
+    address_name TEXT NOT NULL,
+    device_id INTEGER NOT NULL,
+    session_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (address_name, device_id)
+);
+
+CREATE INDEX SignalSession_address ON SignalSession(address_name);
+
+CREATE TABLE SignalPreKey (
+    prekey_id INTEGER NOT NULL PRIMARY KEY,
+    prekey_record BLOB NOT NULL
+);
+
+CREATE TABLE SignalSignedPreKey (
+    signed_prekey_id INTEGER NOT NULL PRIMARY KEY,
+    signed_prekey_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE SignalKyberPreKey (
+    kyber_prekey_id INTEGER NOT NULL PRIMARY KEY,
+    kyber_prekey_record BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER
+);

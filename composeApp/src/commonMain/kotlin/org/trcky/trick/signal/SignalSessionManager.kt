@@ -58,7 +58,8 @@ data class PreKeyBundleData(
     val identityKey: ByteArray,
     val kyberPreKeyId: Int?,
     val kyberPreKeyPublic: ByteArray?,
-    val kyberPreKeySignature: ByteArray?
+    val kyberPreKeySignature: ByteArray?,
+    val dddClientId: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
