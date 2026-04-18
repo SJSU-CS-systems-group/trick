@@ -1,6 +1,7 @@
 package org.trcky.trick
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -16,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import org.trcky.trick.BuildConfig
 import org.trcky.trick.metrics.StressTestReceiver
 import org.trcky.trick.screens.messaging.WifiAwareServiceImpl
 import org.trcky.trick.signal.SignalSessionManager
@@ -48,16 +50,17 @@ class MainActivity : ComponentActivity(), KoinComponent {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Register StressTestReceiver at runtime so implicit ADB broadcasts are delivered.
-        // Manifest-only receivers don't receive implicit broadcasts on Android 8+ (API 26+).
-        val stressFilter = IntentFilter().apply {
-            addAction(StressTestReceiver.ACTION_STRESS_TEST)
-            addAction(StressTestReceiver.ACTION_CANCEL)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(stressTestReceiver, stressFilter, Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(stressTestReceiver, stressFilter)
+        // Register StressTestReceiver at runtime — debug builds only.
+        if (BuildConfig.DEBUG) {
+            val stressFilter = IntentFilter().apply {
+                addAction(StressTestReceiver.ACTION_STRESS_TEST)
+                addAction(StressTestReceiver.ACTION_CANCEL)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(stressTestReceiver, stressFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(stressTestReceiver, stressFilter)
+            }
         }
 
         // Check WiFi Aware support FIRST
@@ -100,10 +103,12 @@ class MainActivity : ComponentActivity(), KoinComponent {
     
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            unregisterReceiver(stressTestReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver was already unregistered
+        if (BuildConfig.DEBUG) {
+            try {
+                unregisterReceiver(stressTestReceiver)
+            } catch (_: IllegalArgumentException) {
+                // Receiver was already unregistered
+            }
         }
     }
 
@@ -136,12 +141,30 @@ class MainActivity : ComponentActivity(), KoinComponent {
     
     private fun requestRequiredPermissions() {
         val requiredPermissions = getRequiredPermissions()
-        
+
         val permissionsToRequest = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        
-        if (permissionsToRequest.isNotEmpty()) {
+
+        if (permissionsToRequest.isEmpty()) return
+
+        val needsLocationRationale = permissionsToRequest.contains(Manifest.permission.ACCESS_FINE_LOCATION)
+            && shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
+
+        if (needsLocationRationale) {
+            AlertDialog.Builder(this)
+                .setTitle("Location Permission Required")
+                .setMessage(
+                    "Trick uses Wi-Fi Aware to discover and connect to nearby devices for " +
+                    "peer-to-peer messaging. Android requires Location permission to use " +
+                    "Wi-Fi Aware. Your location is never stored or shared."
+                )
+                .setPositiveButton("Continue") { _, _ ->
+                    requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
             requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }

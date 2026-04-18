@@ -2,6 +2,7 @@ package org.trcky.trick.screens.messaging
 
 import android.net.wifi.aware.PeerHandle
 import android.util.Log
+import org.trcky.trick.BuildConfig
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -22,7 +23,7 @@ class ConnectionPool {
         }
 
         connections[peerId] = connection
-        Log.d(TAG, "Connection added: $peerId (Total: ${connections.size})")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Connection added: $peerId (Total: ${connections.size})")
         return true
     }
 
@@ -32,7 +33,7 @@ class ConnectionPool {
     fun removeConnection(peerId: String): PeerConnection? {
         val removed = connections.remove(peerId)
         if (removed != null) {
-            Log.d(TAG, "Connection removed: $peerId (Remaining: ${connections.size})")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Connection removed: $peerId (Remaining: ${connections.size})")
         }
         return removed
     }
@@ -77,7 +78,7 @@ class ConnectionPool {
      */
     fun clear() {
         connections.clear()
-        Log.d(TAG, "All connections cleared")
+        if (BuildConfig.DEBUG) Log.d(TAG, "All connections cleared")
     }
 
     /**

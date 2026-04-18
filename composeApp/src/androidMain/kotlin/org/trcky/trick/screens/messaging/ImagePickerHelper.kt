@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import org.trcky.trick.BuildConfig
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -39,7 +40,7 @@ object ImagePickerHelper {
                 return null
             }
 
-            Log.d(TAG, "Original image size: ${originalBitmap.width}x${originalBitmap.height}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Original image size: ${originalBitmap.width}x${originalBitmap.height}")
 
             // Resize if needed
             val resizedBitmap = resizeImage(originalBitmap)
@@ -58,7 +59,7 @@ object ImagePickerHelper {
             // Get filename from URI
             val filename = getFilenameFromUri(context, uri) ?: "image.jpg"
 
-            Log.d(TAG, "Processed image: $filename, ${imageBytes.size} bytes")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Processed image: $filename, ${imageBytes.size} bytes")
 
             return ImageResult(
                 data = imageBytes,
@@ -86,7 +87,7 @@ object ImagePickerHelper {
         val newWidth = (width * scale).toInt()
         val newHeight = (height * scale).toInt()
 
-        Log.d(TAG, "Resizing image from ${width}x${height} to ${newWidth}x${newHeight}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Resizing image from ${width}x${height} to ${newWidth}x${newHeight}")
 
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }

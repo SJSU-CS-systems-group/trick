@@ -5,6 +5,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import org.trcky.trick.BuildConfig
 import java.security.MessageDigest
 
 /**
@@ -43,7 +44,7 @@ object DeviceIdentity {
             // Convert to hex string
             val hexString = hashBytes.joinToString("") { "%02x".format(it) }
 
-            Log.d(TAG, "Generated Device ID: ${hexString.take(16)}...")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Generated Device ID: ${hexString.take(16)}...")
             return hexString
         } catch (e: Exception) {
             Log.e(TAG, "Error generating device ID: ${e.message}", e)
@@ -66,11 +67,11 @@ object DeviceIdentity {
         // is the only reliable approach for consistent results on both Android and iOS.
         return when {
             localDeviceId > remoteDeviceId -> {
-                Log.d(TAG, "Negotiated role: SERVER (lexicographic: local > remote)")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Negotiated role: SERVER (lexicographic: local > remote)")
                 Role.SERVER
             }
             localDeviceId < remoteDeviceId -> {
-                Log.d(TAG, "Negotiated role: CLIENT (lexicographic: local < remote)")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Negotiated role: CLIENT (lexicographic: local < remote)")
                 Role.CLIENT
             }
             else -> {
