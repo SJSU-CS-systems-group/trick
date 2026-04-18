@@ -5,6 +5,7 @@ package org.trcky.trick.screens
 import android.Manifest
 import android.util.Log
 import android.util.Size
+import org.trcky.trick.BuildConfig
 import android.view.MotionEvent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -118,7 +119,7 @@ private fun CameraPreviewWithScanner(
                     .build()
                 cam.cameraControl.startFocusAndMetering(action)
             } catch (e: Exception) {
-                Log.d("QRScanner", "Periodic AF retrigger failed: ${e.message}")
+                if (BuildConfig.DEBUG) Log.d("QRScanner", "Periodic AF retrigger failed: ${e.message}")
             }
         }
     }
@@ -242,9 +243,9 @@ private fun setupTapToFocus(previewView: PreviewView, camera: Camera) {
                     .setAutoCancelDuration(3, TimeUnit.SECONDS)
                     .build()
                 camera.cameraControl.startFocusAndMetering(action)
-                Log.d("QRScanner", "Tap-to-focus triggered at (${event.x}, ${event.y})")
+                if (BuildConfig.DEBUG) Log.d("QRScanner", "Tap-to-focus triggered at (${event.x}, ${event.y})")
             } catch (e: Exception) {
-                Log.d("QRScanner", "Tap-to-focus failed: ${e.message}")
+                if (BuildConfig.DEBUG) Log.d("QRScanner", "Tap-to-focus failed: ${e.message}")
             }
             true
         } else {
@@ -272,7 +273,7 @@ private fun scanBarcodes(
                 if (barcode.format == Barcode.FORMAT_QR_CODE) {
                     val qrCode = barcode.rawValue
                     if (qrCode != null) {
-                        Log.d("QRScanner", "QR Code detected: ${qrCode.length} chars")
+                        if (BuildConfig.DEBUG) Log.d("QRScanner", "QR Code detected: ${qrCode.length} chars")
                         onQRCodeDetected(qrCode)
                     }
                 }

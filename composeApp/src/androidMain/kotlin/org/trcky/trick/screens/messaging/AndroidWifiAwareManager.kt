@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
+import org.trcky.trick.BuildConfig
 import org.trcky.trick.messaging.ChatMessage
 import org.trcky.trick.messaging.PhotoContent
 import org.trcky.trick.messaging.TextContent
@@ -466,7 +467,7 @@ class AndroidWifiAwareManager(
             connectionPool.addConnection(remoteDeviceId, connection)
             pendingHandshakes.remove(peerHandle)
 
-            Log.d(TAG, "[Server] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "[Server] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
             // ── Metrics: stop server connection timer + total connect ─
             val peerShortId = DeviceIdentity.getShortId(remoteDeviceId)
@@ -647,7 +648,7 @@ class AndroidWifiAwareManager(
             connectionPool.addConnection(remoteDeviceId, connection)
             pendingHandshakes.remove(peerHandle)
 
-            Log.d(TAG, "[Client] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "[Client] Connection established with ${DeviceIdentity.getShortId(remoteDeviceId)}")
 
             // ── Metrics: stop client connection timer + total connect ─
             val peerShortId = DeviceIdentity.getShortId(remoteDeviceId)
@@ -876,7 +877,7 @@ class AndroidWifiAwareManager(
             // Build Signal session from verified bundle
             signalSessionManager.buildSessionFromPreKeyBundle(peerId, 1, peerBundle)
             QRKeyDistribution.clearCommitment(peerId)
-            Log.d(TAG, "Bundle verified and Signal session built with ${DeviceIdentity.getShortId(peerId)}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Bundle verified and Signal session built with ${DeviceIdentity.getShortId(peerId)}")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Bundle exchange failed for ${peerId.take(8)}: ${e.message}", e)

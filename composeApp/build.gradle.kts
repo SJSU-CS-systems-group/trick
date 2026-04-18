@@ -145,13 +145,14 @@ kotlin {
 android {
     namespace = "org.trcky.trick"
     compileSdk = 35
+    ndkVersion = libs.versions.androidNdk.get()
 
     defaultConfig {
         applicationId = "org.trcky.trick"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0-beta1"
 
         // Enable multidex to handle libsignal
         multiDexEnabled = true
@@ -171,17 +172,40 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = project.findProperty("TRICK_KEYSTORE_PATH") as String?
+            val keystorePassword = project.findProperty("TRICK_KEYSTORE_PASSWORD") as String?
+            val keyAlias = project.findProperty("TRICK_KEY_ALIAS") as String?
+            val keyPassword = project.findProperty("TRICK_KEY_PASSWORD") as String?
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
             // Disable R8 optimizations that cause issues with libsignal
             proguardFiles(getDefaultProguardFile("proguard-android.txt"))
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
         }
         getByName("debug") {
             isMinifyEnabled = false
             isShrinkResources = false
             // Disable all optimizations for debug and handle libsignal-client JVM classes
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -200,7 +224,7 @@ val cargoBin = "$cargoHome/bin/cargo"
 
 tasks.register<Exec>("buildRustAndroid") {
     workingDir = file("../rust/trick-signal-ffi")
-    environment("ANDROID_NDK_HOME", System.getenv("ANDROID_NDK_HOME") ?: "")
+    environment("ANDROID_NDK_HOME", android.ndkDirectory.absolutePath)
     commandLine(cargoBin, "ndk",
         "-t", "aarch64-linux-android",
         "-t", "x86_64-linux-android",

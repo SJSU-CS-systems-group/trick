@@ -2,6 +2,7 @@ package org.trcky.trick.metrics
 
 import android.os.Build
 import android.util.Log
+import org.trcky.trick.BuildConfig
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -55,7 +56,7 @@ object PerformanceTracker {
             metadata = event.metadata + deviceInfo
         )
         enqueue(eventWithDeviceInfo)
-        Log.d(TAG, "[${event.category}] ${event.name}: ${"%.3f".format(event.durationMs)}ms ${eventWithDeviceInfo.metadata}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "[${event.category}] ${event.name}: ${"%.3f".format(event.durationMs)}ms ${eventWithDeviceInfo.metadata}")
     }
 
     /**
@@ -115,7 +116,7 @@ object PerformanceTracker {
         if (!enabled.get()) return -1
         val token = nextToken.incrementAndGet()
         activeTimers[token] = System.nanoTime()
-        Log.v(TAG, "Timer started: [$category] $name (token=$token)")
+        if (BuildConfig.DEBUG) Log.v(TAG, "Timer started: [$category] $name (token=$token)")
         return token
     }
 

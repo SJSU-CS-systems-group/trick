@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Filter installs to devices that support WiFi Aware and camera -->
+    <uses-feature android:name="android.hardware.wifi.aware" android:required="true"/>
+    <uses-feature android:name="android.hardware.camera" android:required="true"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"/>
@@ -14,7 +18,7 @@
     <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:name=".MessagingApp"
@@ -32,15 +36,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Stress test trigger via ADB broadcasts -->
-        <receiver
-            android:name=".metrics.StressTestReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="org.trcky.trick.STRESS_TEST" />
-                <action android:name="org.trcky.trick.STRESS_TEST_CANCEL" />
-            </intent-filter>
-        </receiver>
+
     </application>
 
 </manifest>

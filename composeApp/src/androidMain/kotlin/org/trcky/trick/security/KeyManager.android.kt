@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
+import org.trcky.trick.BuildConfig
 import org.trcky.trick.libsignal.IdentityKeyPair
 import org.trcky.trick.libsignal.PrivateKey
 import org.trcky.trick.libsignal.PublicKey
@@ -45,7 +46,7 @@ actual class KeyManager(private val context: Context) {
      */
     private fun getMasterKey(): SecretKey {
         if (!keyStore.containsAlias(MASTER_KEY_ALIAS)) {
-            Log.d(TAG, "Generating new master key in KeyStore")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Generating new master key in KeyStore")
             val keyGenerator = KeyGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_AES,
                 "AndroidKeyStore"
@@ -71,7 +72,7 @@ actual class KeyManager(private val context: Context) {
      * The private key is encrypted with the master key before storage.
      */
     actual fun generateIdentityKeyPair(): IdentityKeyPair {
-        Log.d(TAG, "Generating new identity key pair")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Generating new identity key pair")
         val keyPair = libSignalManager.generateIdentityKeyPair()
 
         // Encrypt private key with master key
@@ -87,7 +88,7 @@ actual class KeyManager(private val context: Context) {
             .putString(PREF_PUBLIC_KEY, Base64.encodeToString(keyPair.publicKey.data, Base64.NO_WRAP))
             .apply()
 
-        Log.d(TAG, "Identity key pair stored securely")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Identity key pair stored securely")
         return keyPair
     }
 
@@ -97,7 +98,7 @@ actual class KeyManager(private val context: Context) {
      */
     actual fun getIdentityKeyPair(): IdentityKeyPair? {
         val encryptedPrivateKeyStr = prefs.getString(PREF_PRIVATE_KEY_ENCRYPTED, null) ?: run {
-            Log.d(TAG, "No identity key pair found")
+            if (BuildConfig.DEBUG) Log.d(TAG, "No identity key pair found")
             return null
         }
         val ivStr = prefs.getString(PREF_PRIVATE_KEY_IV, null) ?: return null
@@ -118,7 +119,7 @@ actual class KeyManager(private val context: Context) {
                 PrivateKey(privateKeyData),
                 PublicKey(publicKeyData)
             )
-            Log.d(TAG, "Identity key pair retrieved successfully")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Identity key pair retrieved successfully")
             keyPair
         } catch (e: Exception) {
             Log.e(TAG, "Failed to retrieve identity key pair: ${e.message}", e)
@@ -133,7 +134,7 @@ actual class KeyManager(private val context: Context) {
         prefs.edit()
             .putString("$PEER_KEY_PREFIX$peerId", Base64.encodeToString(publicKey.data, Base64.NO_WRAP))
             .apply()
-        Log.d(TAG, "Stored public key for peer: $peerId")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Stored public key for peer: $peerId")
     }
 
     /**
@@ -151,7 +152,7 @@ actual class KeyManager(private val context: Context) {
         prefs.edit()
             .remove("$PEER_KEY_PREFIX$peerId")
             .apply()
-        Log.d(TAG, "Removed public key for peer: $peerId")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Removed public key for peer: $peerId")
     }
 
     /**

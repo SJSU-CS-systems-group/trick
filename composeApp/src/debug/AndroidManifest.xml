@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Stress test trigger via ADB broadcasts — debug builds only -->
+        <receiver
+            android:name=".metrics.StressTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.trcky.trick.STRESS_TEST" />
+                <action android:name="org.trcky.trick.STRESS_TEST_CANCEL" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
