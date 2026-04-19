@@ -23,6 +23,8 @@ import org.trcky.trick.screens.KeyDistributionScreen
 import org.trcky.trick.security.KeyDistributionPayload
 import org.trcky.trick.security.KeyManager
 import org.trcky.trick.security.QRKeyDistribution
+import org.trcky.trick.security.generateQRPayload
+import org.trcky.trick.security.verifyAndStoreQRPayload
 import org.trcky.trick.security.TRCKY_ORG_BASE_URL
 import org.trcky.trick.signal.PreKeyBundleData
 import org.trcky.trick.signal.SignalSessionManager
