@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trick — serverless, end-to-end encrypted, offline messaging</title>
+<meta name="description" content="Trick is a cross-platform offline messenger using Wi-Fi Aware for peer-to-peer transport and the Signal Protocol with Kyber-1024 post-quantum cryptography.">
+<style>
+  :root {
+    --fg: #111;
+    --muted: #555;
+    --bg: #fafafa;
+    --accent: #0a66c2;
+    --border: #e5e5e5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  h1 { font-size: 2.25rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+  .tagline { color: var(--muted); margin: 0 0 2rem; font-size: 1.1rem; }
+  h2 { margin-top: 2.25rem; font-size: 1.25rem; }
+  p { color: var(--fg); }
+  ul { padding-left: 1.25rem; }
+  li { margin: 0.25rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #fff;
+    border: 1px solid var(--border);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+  .links { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+  .links a {
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 0.5rem 0.9rem;
+    border-radius: 6px;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Trick</h1>
+  <p class="tagline">Serverless, end-to-end encrypted, offline messaging.</p>
+
+  <p>
+    Trick is a cross-platform messenger that works without internet or cellular service.
+    Devices discover each other over Wi-Fi Aware and exchange messages directly, with
+    confidentiality provided by the Signal Protocol and Kyber-1024 post-quantum
+    cryptography. It targets scenarios where infrastructure is unavailable —
+    disaster response, remote deployments, and congested events.
+  </p>
+
+  <h2>Features</h2>
+  <ul>
+    <li>Peer-to-peer messaging over Wi-Fi Aware — no access point required</li>
+    <li>Signal Protocol with Double Ratchet, X3DH, and Kyber-1024 post-quantum prekeys</li>
+    <li>QR code key exchange for in-person session establishment</li>
+    <li>Text and image messaging with persistent encrypted history</li>
+    <li>Automatic reconnection with session state recovery</li>
+  </ul>
+
+  <h2>Platforms</h2>
+  <p>
+    Android 8.0+ and iOS 26+. Shared Kotlin Multiplatform codebase, with all
+    cryptographic operations in a shared Rust crate wrapping
+    <a href="https://github.com/signalapp/libsignal">libsignal</a>.
+  </p>
+
+  <div class="links">
+    <a href="https://github.com/SJSU-CS-systems-group/trick">Source on GitHub</a>
+    <a href="https://github.com/SJSU-CS-systems-group/trick#readme">Read the docs</a>
+  </div>
+
+  <footer>
+    Built at SJSU. Source licensed under the repository's terms.
+  </footer>
+</main>
+</body>
+</html>
